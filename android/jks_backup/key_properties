@@ -1,0 +1,4 @@
+storePassword=Wass29
+keyPassword=Wass29
+keyAlias=my_key_alias
+storeFile=app/key.jks

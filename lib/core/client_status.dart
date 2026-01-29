@@ -1,0 +1,4 @@
+enum ClientStatus {
+  loggedOut,
+  loggedIn
+}

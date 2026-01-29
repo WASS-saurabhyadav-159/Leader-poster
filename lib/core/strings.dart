@@ -1,0 +1,2 @@
+const String forgotPasswordText = "Lorem ipsum is a dummy or placeholder text commonly used in graphic design, publishing, and web development to fill empty spaces in a layout ";
+const String notificationText = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do";
