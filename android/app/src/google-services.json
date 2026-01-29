@@ -1,116 +1,21 @@
 {
   "project_info": {
-    "project_number": "733354534161",
-    "project_id": "bjpapp-18596",
-    "storage_bucket": "bjpapp-18596.firebasestorage.app"
+    "project_number": "981739718659",
+    "project_id": "bjpposter-9e430",
+    "storage_bucket": "bjpposter-9e430.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:733354534161:android:529b979ed81e935f0358b0",
+        "mobilesdk_app_id": "1:981739718659:android:275a0dcd16542bb85de636",
         "android_client_info": {
-          "package_name": "com.BRS.poster"
+          "package_name": "com.leaderposter.poster"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyB9qpmigN5mR41WRlrTwgGWBcqJ_eEVQZM"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:733354534161:android:d4b4ff7f4679bfd60358b0",
-        "android_client_info": {
-          "package_name": "com.Congress.poster"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyB9qpmigN5mR41WRlrTwgGWBcqJ_eEVQZM"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:733354534161:android:54a43a8b41d8f1d80358b0",
-        "android_client_info": {
-          "package_name": "com.Ysrcp.poster"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyB9qpmigN5mR41WRlrTwgGWBcqJ_eEVQZM"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:733354534161:android:a85d33594a631f240358b0",
-        "android_client_info": {
-          "package_name": "com.janasena.poster"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyB9qpmigN5mR41WRlrTwgGWBcqJ_eEVQZM"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:733354534161:android:d41668ab566732e80358b0",
-        "android_client_info": {
-          "package_name": "com.tdp.poster"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyB9qpmigN5mR41WRlrTwgGWBcqJ_eEVQZM"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:733354534161:android:54b8612005f7da2f0358b0",
-        "android_client_info": {
-          "package_name": "com.wassbjp.poster"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyB9qpmigN5mR41WRlrTwgGWBcqJ_eEVQZM"
+          "current_key": "AIzaSyBzzRuL5tg5BArOBb3ocOMAJqj6PHbqrPk"
         }
       ],
       "services": {

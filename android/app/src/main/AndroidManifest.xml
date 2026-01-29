@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.janasena.poster">
+    package="com.leaderposter.poster">
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
@@ -11,7 +11,7 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
     <application
-        android:label="Janasena poster"
+        android:label="Leader Poster"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
 

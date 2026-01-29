@@ -18,6 +18,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _otpController = TextEditingController();
+  final TextEditingController _stateController = TextEditingController();
+  final TextEditingController _constituencyController = TextEditingController();
+  final TextEditingController _referralCodeController = TextEditingController();
+  final TextEditingController _designationController = TextEditingController();
   bool _isLoading = false;
   bool _isPhoneVerified = false;
   bool _showVerifyButton = false;
@@ -388,6 +392,33 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                           child: Icon(Icons.verified, color: Colors.green, size: 28),
                         ),
                     ],
+                  ),
+                  const SizedBox(height: 15),
+                  _buildTextField(
+                    controller: _stateController,
+                    label: "Enter State*",
+                    icon: Icons.location_on,
+                    validator: (value) => value!.isEmpty ? "State is required" : null,
+                  ),
+                  const SizedBox(height: 15),
+                  _buildTextField(
+                    controller: _constituencyController,
+                    label: "Enter Constituency*",
+                    icon: Icons.location_city,
+                    validator: (value) => value!.isEmpty ? "Constituency is required" : null,
+                  ),
+                  const SizedBox(height: 15),
+                  _buildTextField(
+                    controller: _referralCodeController,
+                    label: "Enter Referral Code",
+                    icon: Icons.card_giftcard,
+                  ),
+                  const SizedBox(height: 15),
+                  _buildTextField(
+                    controller: _designationController,
+                    label: "Enter Designation*",
+                    icon: Icons.work,
+                    validator: (value) => value!.isEmpty ? "Designation is required" : null,
                   ),
                   const SizedBox(height: 20),
                   SizedBox(

@@ -16,7 +16,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.janasena.poster"
+    namespace = "com.leaderposter.poster"
     compileSdk = 36
 
     compileOptions {
@@ -29,12 +29,12 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.janasena.poster"
+        applicationId = "com.leaderposter.poster"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = 5
         versionName = "1.0.4"
-        resValue("string", "app_name", "janasena poster")
+        resValue("string", "app_name", "Leader Poster")
         manifestPlaceholders["applicationName"] = "io.flutter.app.FlutterApplication"
     }
 

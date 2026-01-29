@@ -21,6 +21,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController profileIdController = TextEditingController();
   final TextEditingController userIdController = TextEditingController();
+  final TextEditingController stateController = TextEditingController();
+  final TextEditingController constituencyController = TextEditingController();
+  final TextEditingController referralCodeController = TextEditingController();
+  final TextEditingController designationController = TextEditingController();
 
   @override
   void initState() {
@@ -40,6 +44,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
             profileData['userDetail']['email'] ?? profileData['email'] ?? '';
         profileIdController.text = profileData['id'] ?? '';
         userIdController.text = profileData['userDetail']['userId'] ?? '';
+        stateController.text = profileData['userDetail']['state'] ?? '';
+        constituencyController.text = profileData['userDetail']['constituency'] ?? '';
+        referralCodeController.text = profileData['userDetail']['referralCode'] ?? '';
+        designationController.text = profileData['userDetail']['designation'] ?? '';
         isFetching = false;
       });
     } catch (e) {
@@ -112,6 +120,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
           _buildProfileField("Name", Icons.person, nameController, isEditable: true),
           _buildProfileField("Phone", Icons.phone, phoneController, isEditable: false),
           _buildProfileField("Email", Icons.email, emailController, isEditable: true),
+          _buildProfileField("State", Icons.location_on, stateController, isEditable: true),
+          _buildProfileField("Constituency", Icons.location_city, constituencyController, isEditable: true),
+          _buildProfileField("Referral Code", Icons.card_giftcard, referralCodeController, isEditable: true),
+          _buildProfileField("Designation", Icons.work, designationController, isEditable: true),
           _buildProfileField("Profile ID", Icons.badge, profileIdController, isEditable: false),
           _buildProfileField("User ID", Icons.perm_identity, userIdController, isEditable: false),
           if (isEditing) _buildUpdateButton(),
@@ -200,6 +212,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
     emailController.dispose();
     profileIdController.dispose();
     userIdController.dispose();
+    stateController.dispose();
+    constituencyController.dispose();
+    referralCodeController.dispose();
+    designationController.dispose();
     super.dispose();
   }
 }
