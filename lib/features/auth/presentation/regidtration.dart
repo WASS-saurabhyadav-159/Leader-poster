@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../../config/colors.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/network/local_storage.dart';
+import '../../../widgets/constituency_dropdown.dart';
 
 class RegistrationScreen extends StatefulWidget {
   @override
@@ -29,6 +30,27 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _otpVerified = false; // Track if OTP is verified but not yet registered
 
   bool _isOtpDialogOpen = false; // Only one dialog at a time
+
+  // Sample constituency list - replace with your actual data
+  final List<String> constituencies = [
+    'Adilabad',
+    'Peddapalli',
+    'Karimnagar',
+    'Nizamabad',
+    'Zahirabad',
+    'Medak',
+    'Malkajgiri',
+    'Secunderabad',
+    'Hyderabad',
+    'Chevella',
+    'Mahbubnagar',
+    'Nagarkurnool',
+    'Nalgonda',
+    'Bhongir',
+    'Warangal',
+    'Mahabubabad',
+    'Khammam',
+  ];
 
   @override
   void initState() {
@@ -401,10 +423,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     validator: (value) => value!.isEmpty ? "State is required" : null,
                   ),
                   const SizedBox(height: 15),
-                  _buildTextField(
+                  ConstituencyDropdown(
                     controller: _constituencyController,
-                    label: "Enter Constituency*",
-                    icon: Icons.location_city,
+                    constituencies: constituencies,
                     validator: (value) => value!.isEmpty ? "Constituency is required" : null,
                   ),
                   const SizedBox(height: 15),
