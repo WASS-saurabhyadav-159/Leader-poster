@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import '../core/network/api_service.dart';
+import '../core/utils/error_handler.dart';
 
 class ConstituencyDropdown extends StatefulWidget {
   final TextEditingController controller;
   final String? Function(String?)? validator;
-  final List<String> constituencies;
+  final int? stateId;
+  final Function(int?)? onConstituencySelected;
 
   const ConstituencyDropdown({
     Key? key,
     required this.controller,
     this.validator,
-    required this.constituencies,
+    this.stateId,
+    this.onConstituencySelected,
   }) : super(key: key);
 
   @override
@@ -17,34 +21,89 @@ class ConstituencyDropdown extends StatefulWidget {
 }
 
 class _ConstituencyDropdownState extends State<ConstituencyDropdown> {
-  List<String> filteredConstituencies = [];
-  bool isDropdownOpen = false;
+  List<Map<String, dynamic>> constituencies = [];
+  List<Map<String, dynamic>> filteredConstituencies = [];
+  bool isLoading = false;
+  final ApiService _apiService = ApiService();
 
   @override
   void initState() {
     super.initState();
-    filteredConstituencies = widget.constituencies;
+    if (widget.stateId != null) {
+      _fetchConstituencies();
+    }
+  }
+
+  @override
+  void didUpdateWidget(ConstituencyDropdown oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.stateId != oldWidget.stateId) {
+      widget.controller.clear();
+      if (widget.stateId != null) {
+        _fetchConstituencies();
+      } else {
+        setState(() {
+          constituencies = [];
+          filteredConstituencies = [];
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchConstituencies() async {
+    if (widget.stateId == null) return;
+    
+    setState(() {
+      isLoading = true;
+      constituencies = [];
+      filteredConstituencies = [];
+    });
+    try {
+      final result = await _apiService.fetchConstituencies(
+        stateId: widget.stateId!,
+        limit: 100,
+        offset: 0,
+      );
+      setState(() {
+        constituencies = result;
+        filteredConstituencies = result;
+      });
+    } catch (e) {
+      final errorMsg = await ErrorHandler.getErrorMessage(e);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMsg)),
+      );
+    } finally {
+      setState(() => isLoading = false);
+    }
   }
 
   void _filterConstituencies(String query) {
     setState(() {
       if (query.isEmpty) {
-        filteredConstituencies = widget.constituencies;
+        filteredConstituencies = constituencies;
       } else {
-        filteredConstituencies = widget.constituencies
+        filteredConstituencies = constituencies
             .where((constituency) =>
-                constituency.toLowerCase().contains(query.toLowerCase()))
+                constituency['name'].toString().toLowerCase().contains(query.toLowerCase()))
             .toList();
       }
     });
   }
 
   void _showConstituencyDialog() {
+    if (widget.stateId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Please select a state first")),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, setDialogState) {
             return AlertDialog(
               title: Text("Select Constituency"),
               content: Container(
@@ -60,23 +119,29 @@ class _ConstituencyDropdownState extends State<ConstituencyDropdown> {
                       ),
                       onChanged: (value) {
                         _filterConstituencies(value);
-                        setState(() {});
+                        setDialogState(() {});
                       },
                     ),
                     SizedBox(height: 10),
                     Expanded(
-                      child: ListView.builder(
-                        itemCount: filteredConstituencies.length,
-                        itemBuilder: (context, index) {
-                          return ListTile(
-                            title: Text(filteredConstituencies[index]),
-                            onTap: () {
-                              widget.controller.text = filteredConstituencies[index];
-                              Navigator.pop(context);
-                            },
-                          );
-                        },
-                      ),
+                      child: isLoading
+                          ? Center(child: CircularProgressIndicator())
+                          : filteredConstituencies.isEmpty
+                              ? Center(child: Text("No constituencies found"))
+                              : ListView.builder(
+                                  itemCount: filteredConstituencies.length,
+                                  itemBuilder: (context, index) {
+                                    final constituency = filteredConstituencies[index];
+                                    return ListTile(
+                                      title: Text(constituency['name']),
+                                      onTap: () {
+                                        widget.controller.text = constituency['name'];
+                                        widget.onConstituencySelected?.call(constituency['id']);
+                                        Navigator.pop(context);
+                                      },
+                                    );
+                                  },
+                                ),
                     ),
                   ],
                 ),

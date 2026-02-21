@@ -7,6 +7,7 @@ import '../../../config/colors.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/network/local_storage.dart';
 import '../../../widgets/constituency_dropdown.dart';
+import '../../../widgets/state_dropdown.dart';
 
 class RegistrationScreen extends StatefulWidget {
   @override
@@ -30,27 +31,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _otpVerified = false; // Track if OTP is verified but not yet registered
 
   bool _isOtpDialogOpen = false; // Only one dialog at a time
+  int? _selectedStateId; // Store selected state ID
+  int? _selectedConstituencyId; // Store selected constituency ID
 
-  // Sample constituency list - replace with your actual data
-  final List<String> constituencies = [
-    'Adilabad',
-    'Peddapalli',
-    'Karimnagar',
-    'Nizamabad',
-    'Zahirabad',
-    'Medak',
-    'Malkajgiri',
-    'Secunderabad',
-    'Hyderabad',
-    'Chevella',
-    'Mahbubnagar',
-    'Nagarkurnool',
-    'Nalgonda',
-    'Bhongir',
-    'Warangal',
-    'Mahabubabad',
-    'Khammam',
-  ];
+
 
   @override
   void initState() {
@@ -294,8 +278,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           name: _nameController.text.trim(),
           phoneNumber: _phoneController.text.trim(),
           masterAppId: masterAppId,
-          email: _emailController.text.trim().isNotEmpty
-              ? _emailController.text.trim()
+          email: _emailController.text.trim(),
+          state: _stateController.text.trim(),
+          constituency: _constituencyController.text.trim(),
+          referredBy: _referralCodeController.text.trim().isNotEmpty
+              ? _referralCodeController.text.trim()
+              : null,
+          designation: _designationController.text.trim().isNotEmpty
+              ? _designationController.text.trim()
               : null,
         );
 
@@ -303,7 +293,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("Registration Successful!")),
           );
-          Navigator.pop(context); // Navigate only here on explicit Register button press
+          Navigator.pop(context);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("Registration failed: ${response['message']}")),
@@ -358,11 +348,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   const SizedBox(height: 15),
                   _buildTextField(
                     controller: _emailController,
-                    label: "Enter Email *",
+                    label: "Enter Email*",
                     icon: Icons.email,
                     keyboardType: TextInputType.emailAddress,
                     validator: (value) {
-                      if (value!.isNotEmpty && !RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(value)) {
+                      if (value == null || value.isEmpty) {
+                        return "Email is required";
+                      }
+                      if (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(value)) {
                         return "Enter a valid email";
                       }
                       return null;
@@ -416,17 +409,26 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ],
                   ),
                   const SizedBox(height: 15),
-                  _buildTextField(
+                  StateDropdown(
                     controller: _stateController,
-                    label: "Enter State*",
-                    icon: Icons.location_on,
                     validator: (value) => value!.isEmpty ? "State is required" : null,
+                    onStateSelected: (stateId) {
+                      setState(() {
+                        _selectedStateId = stateId;
+                        _constituencyController.clear(); // Clear constituency when state changes
+                      });
+                    },
                   ),
                   const SizedBox(height: 15),
                   ConstituencyDropdown(
                     controller: _constituencyController,
-                    constituencies: constituencies,
+                    stateId: _selectedStateId,
                     validator: (value) => value!.isEmpty ? "Constituency is required" : null,
+                    onConstituencySelected: (constituencyId) {
+                      setState(() {
+                        _selectedConstituencyId = constituencyId;
+                      });
+                    },
                   ),
                   const SizedBox(height: 15),
                   _buildTextField(
@@ -437,9 +439,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   const SizedBox(height: 15),
                   _buildTextField(
                     controller: _designationController,
-                    label: "Enter Designation*",
+                    label: "Enter Designation",
                     icon: Icons.work,
-                    validator: (value) => value!.isEmpty ? "Designation is required" : null,
                   ),
                   const SizedBox(height: 20),
                   SizedBox(

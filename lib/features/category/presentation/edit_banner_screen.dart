@@ -1769,6 +1769,8 @@ import '../../../core/models/FooterImage.dart';
 import '../../../core/models/ProtocolImage.dart';
 import '../../../core/models/SelfImage.dart';
 import '../../../core/network/api_service.dart';
+import '../../../core/services/background_removal_service.dart';
+import '../../../widgets/image_crop_dialog.dart';
 
 // Update the constructor of SocialMediaDetailsPage
 class SocialMediaDetailsPage extends StatefulWidget {
@@ -2705,7 +2707,12 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
   Widget _buildImageRow() {
     const double imageBoxSize = 60.0;
     const double boxSpacing = 8.0;
-    final List<SelfImage> scrollableImages = _filteredSelfImages;
+    
+    // Combine backend images first, then uploaded images
+    final List<dynamic> allImages = [
+      ..._filteredSelfImages,
+      ..._uploadedImages,
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2722,37 +2729,57 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
           height: imageBoxSize,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            itemCount: scrollableImages.length + 1, // +1 for the plus icon
+            itemCount: allImages.length + 1, // +1 for the plus icon
             separatorBuilder: (context, index) => SizedBox(width: boxSpacing),
             itemBuilder: (context, index) {
               // Last item is the plus icon
-              if (index == scrollableImages.length) {
+              if (index == allImages.length) {
                 return _buildPlusIcon();
               }
 
-              final image = scrollableImages[index];
-              final isSelected = _selectedSelfImageUrls.contains(image.imageUrl);
+              final item = allImages[index];
+              final isBackendImage = item is SelfImage;
+              final isSelected = isBackendImage
+                  ? _selectedSelfImageUrls.contains(item.imageUrl)
+                  : _selectedUploadedImage?.path == (item as File).path;
 
               return GestureDetector(
                 onTap: () {
-                  if (isSelected) {
-                    // Unselect if already selected
-                    setState(() {
-                      _selectedSelfImageUrls.remove(image.imageUrl);
-                      _selectedSelfImage = null;
-                      _selectedApiImageUrl = null;
-                    });
+                  if (isBackendImage) {
+                    final image = item as SelfImage;
+                    if (isSelected) {
+                      setState(() {
+                        _selectedSelfImageUrls.remove(image.imageUrl);
+                        _selectedSelfImage = null;
+                        _selectedApiImageUrl = null;
+                      });
+                    } else {
+                      setState(() {
+                        _selectedSelfImageUrls.clear();
+                        _selectedSelfImageUrls.add(image.imageUrl);
+                        _selectedSelfImage = image;
+                        _selectedApiImageUrl = image.imageUrl;
+                        _selectedUploadedImage = null;
+                        _selectedAssetImage = null;
+                        _updatePosition(image.position);
+                      });
+                    }
                   } else {
-                    // Select new image and clear previous selection
-                    setState(() {
-                      _selectedSelfImageUrls.clear();
-                      _selectedSelfImageUrls.add(image.imageUrl);
-                      _selectedSelfImage = image;
-                      _selectedApiImageUrl = image.imageUrl;
-                      _selectedUploadedImage = null;
-                      _selectedAssetImage = null;
-                      _updatePosition(image.position);
-                    });
+                    final file = item as File;
+                    if (isSelected) {
+                      setState(() {
+                        _selectedUploadedImage = null;
+                      });
+                    } else {
+                      setState(() {
+                        _selectedUploadedImage = file;
+                        _selectedAssetImage = null;
+                        _selectedApiImageUrl = null;
+                        _selectedSelfImageUrls.clear();
+                        _selectedSelfImage = null;
+                        _updatePosition('right');
+                      });
+                    }
                   }
                 },
                 child: Container(
@@ -2771,28 +2798,39 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
                     borderRadius: BorderRadius.circular(6),
                     child: Stack(
                       children: [
-                        Image.network(
-                          image.imageUrl,
-                          fit: BoxFit.cover,
-                          width: imageBoxSize,
-                          height: imageBoxSize,
-                          loadingBuilder: (context, child, progress) {
-                            if (progress == null) return child;
-                            return Center(
-                              child: CircularProgressIndicator(
-                                value: progress.expectedTotalBytes != null
-                                    ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                                    : null,
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: Colors.grey,
-                              child: Icon(Icons.broken_image, color: Colors.white),
-                            );
-                          },
-                        ),
+                        // Image display
+                        if (isBackendImage)
+                          Image.network(
+                            (item as SelfImage).imageUrl,
+                            fit: BoxFit.cover,
+                            width: imageBoxSize,
+                            height: imageBoxSize,
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) return child;
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  value: progress.expectedTotalBytes != null
+                                      ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                                      : null,
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: Colors.grey,
+                                child: Icon(Icons.broken_image, color: Colors.white),
+                              );
+                            },
+                          )
+                        else
+                          Image.file(
+                            item as File,
+                            fit: BoxFit.cover,
+                            width: imageBoxSize,
+                            height: imageBoxSize,
+                          ),
+                        
+                        // Selection checkmark
                         if (isSelected)
                           Positioned(
                             top: 4,
@@ -2807,6 +2845,36 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
                                 Icons.check,
                                 color: Colors.white,
                                 size: 12,
+                              ),
+                            ),
+                          ),
+                        
+                        // Delete icon for uploaded images only
+                        if (!isBackendImage)
+                          Positioned(
+                            bottom: 4,
+                            right: 4,
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  final file = item as File;
+                                  _uploadedImages.remove(file);
+                                  if (_selectedUploadedImage?.path == file.path) {
+                                    _selectedUploadedImage = null;
+                                  }
+                                });
+                              },
+                              child: Container(
+                                padding: EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.delete,
+                                  color: Colors.white,
+                                  size: 12,
+                                ),
                               ),
                             ),
                           ),
@@ -2842,18 +2910,140 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
 
 // Update the image picker method to handle adding to the list
   Future<void> _pickAndAddImage() async {
+    // Show info dialog first
+    final shouldProceed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Upload Image',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text(
+              'Please upload images with a plain background for better results.',
+              style: TextStyle(fontSize: 16),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'మంచి ఫలితాల కోసం ప్లేన్ బ్యాక్‌గ్రౌండ్ ఉన్న ఫోటోలను అప్లోడ్ చేయండి.',
+              style: TextStyle(fontSize: 15),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SharedColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'OK',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+
+    // If user cancelled, return early
+    if (shouldProceed != true) return;
+
     final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
-      setState(() {
-        _uploadedImages.add(File(pickedFile.path));
-        // Auto-select the newly uploaded image
-        _selectedUploadedImage = File(pickedFile.path);
-        _selectedAssetImage = null;
-        _selectedApiImageUrl = null;
-        _selectedSelfImageUrls.clear();
-        _selectedSelfImage = null;
-        _updatePosition('right');
-      });
+      // Show attractive loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Center(
+          child: Container(
+            margin: EdgeInsets.symmetric(horizontal: 40),
+            padding: EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation<Color>(SharedColors.primary),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  '✨ Removing background...',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      // Remove background
+      final processedImage = await BackgroundRemovalService.removeBackground(File(pickedFile.path));
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      final imageToUse = processedImage ?? File(pickedFile.path);
+
+      if (processedImage == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Background removal failed. Using original image.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Open crop dialog
+      final croppedFile = await showDialog<File?>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => ImageCropDialog(imageFile: imageToUse),
+      );
+
+      // Add to list if user confirmed crop
+      if (croppedFile != null) {
+        setState(() {
+          _uploadedImages.add(croppedFile);
+          _selectedUploadedImage = croppedFile;
+          _selectedAssetImage = null;
+          _selectedApiImageUrl = null;
+          _selectedSelfImageUrls.clear();
+          _selectedSelfImage = null;
+          _updatePosition('right');
+        });
+      }
     }
   }
 

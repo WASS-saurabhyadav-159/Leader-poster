@@ -3,15 +3,19 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:connectivity_plus/connectivity_plus.dart'; // Add this import
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../config/colors.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/network/local_storage.dart';
+import '../../../screens/SubscriptionHistoryPage.dart';
 import '../../auth/presentation/login.dart';
 import 'package:logger/logger.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/utils/error_handler.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'PageContentScreen .dart';
+import 'SuggestionPage.dart';
 import 'editprofilenamepage.dart' hide SharedColors;
 
 final Logger logger = Logger(); // Initialize the logger
@@ -35,31 +39,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<Map<String, dynamic>?> _fetchProfile() async {
     try {
-      // Check internet connection first
-      var connectivityResult = await Connectivity().checkConnectivity();
-      if (connectivityResult == ConnectivityResult.none) {
-        return null; // No internet
-      }
-      return await ApiService().getProfile(); // Fetch profile from API
+      return await ApiService().getProfile();
     } catch (e) {
-      return null;
+      logger.e("Profile fetch error: $e");
+      rethrow;
     }
   }
 
   Future<Map<String, dynamic>?> _fetchProfileWithRetry() async {
-    final result = await _fetchProfile();
-    if (result == null) {
-      // Delay slightly to allow widget to build before showing dialog
+    try {
+      final result = await _fetchProfile();
+      return result;
+    } catch (e) {
+      logger.e("[ProfileScreen] Error in _fetchProfileWithRetry: $e");
       await Future.delayed(const Duration(milliseconds: 100));
       if (mounted) {
-        showErrorPopup(context, "Failed to load profile. Please check your internet connection.", () {
+        final errorMessage = await ErrorHandler.getErrorMessage(e);
+        showErrorPopup(context, errorMessage, () {
           setState(() {
             _profileFuture = _fetchProfileWithRetry();
           });
         });
       }
+      return null;
     }
-    return result;
   }
 
   Future<void> _pickImage() async {
@@ -74,17 +77,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<bool> _uploadProfileImage(File imageFile) async {
     try {
-      // Check internet connection first
-      var connectivityResult = await Connectivity().checkConnectivity();
-      if (connectivityResult == ConnectivityResult.none) {
-        if (mounted) {
-          showErrorPopup(context, "No internet connection. Please try again.", () {
-            _uploadProfileImage(imageFile);
-          });
-        }
-        return false;
-      }
-
       FormData formData = FormData.fromMap({
         "file": await MultipartFile.fromFile(imageFile.path, filename: "profile.jpg"),
       });
@@ -101,7 +93,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (response.statusCode == 200) {
         logger.i("Profile image uploaded successfully: ${response.data}");
         setState(() {
-          _profileFuture = _fetchProfileWithRetry(); // Refresh profile data
+          _profileFuture = _fetchProfileWithRetry();
         });
         return true;
       } else {
@@ -111,7 +103,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       logger.e("Upload error: $e");
       if (mounted) {
-        showErrorPopup(context, "Failed to upload image. Please try again.", () {
+        final errorMsg = await ErrorHandler.getErrorMessage(e);
+        showErrorPopup(context, errorMsg, () {
           _uploadProfileImage(imageFile);
         });
       }
@@ -358,6 +351,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                         ),
+
+                        _buildSettingTile(
+                          "Suggestion",
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SuggestionPage(),
+                            ),
+                          ),
+
+                        ),
+
+                        _buildSettingTile(
+                          "Subscription History",
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const SubscriptionHistoryPage(),
+                            ),
+                          ),
+
+                        ),
+                        _buildSettingTile(
+                          "Rate Us",
+                          onTap: () => _rateApp(),
+                        ),
+                        _buildSettingTile(
+                          "Share App",
+                          onTap: () => _shareApp(),
+                        ),
+                        _buildSettingTile(
+                          "Help and Support",
+                          onTap: () => _openWhatsApp(),
+                        ),
                         // _buildSettingTile(
                         //   "Version",
                         //   onTap: () => Navigator.push(
@@ -539,6 +566,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
       mode: LaunchMode.inAppWebView,
     )) {
       debugPrint("Could not launch $url");
+    }
+  }
+
+  Future<void> _rateApp() async {
+    const String playStoreUrl = 'https://play.google.com/store/apps/details?id=com.leaderposter.poster';
+    final Uri uri = Uri.parse(playStoreUrl);
+    
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      logger.e("Could not launch Play Store");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Could not open Play Store")),
+        );
+      }
+    }
+  }
+
+  Future<void> _shareApp() async {
+    const String appLink = 'https://play.google.com/store/apps/details?id=com.leaderposter.poster';
+    const String shareText = 'Check out this amazing app: $appLink';
+    
+    try {
+      await Share.share(shareText);
+    } catch (e) {
+      logger.e("Could not share app: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Could not share app")),
+        );
+      }
+    }
+  }
+
+  Future<void> _openWhatsApp() async {
+    const String phoneNumber = '918125262928';
+    const String message = 'Hi, I need help with the app';
+    final Uri uri = Uri.parse('https://wa.me/$phoneNumber?text=${Uri.encodeComponent(message)}');
+    
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      logger.e("Could not open WhatsApp");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Could not open WhatsApp")),
+        );
+      }
     }
   }
 }

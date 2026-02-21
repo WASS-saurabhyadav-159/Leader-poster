@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import '../../../config/colors.dart';
 import '../../../core/network/api_service.dart';
+import '../../../widgets/state_dropdown.dart';
+import '../../../widgets/constituency_dropdown.dart';
+import '../../../core/utils/error_handler.dart';
 
 
 
@@ -25,6 +28,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final TextEditingController constituencyController = TextEditingController();
   final TextEditingController referralCodeController = TextEditingController();
   final TextEditingController designationController = TextEditingController();
+
+  int? _selectedStateId;
+  int? _selectedConstituencyId;
 
   @override
   void initState() {
@@ -53,7 +59,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     } catch (e) {
       logger.e("Failed to fetch profile: $e");
       setState(() => isFetching = false);
-      _showSnackBar("Failed to load profile data");
+      final errorMsg = await ErrorHandler.getErrorMessage(e);
+      _showSnackBar(errorMsg);
     }
   }
 
@@ -62,22 +69,30 @@ class _EditProfilePageState extends State<EditProfilePage> {
       _showSnackBar("Name and email cannot be empty");
       return;
     }
+    if (stateController.text.isEmpty || constituencyController.text.isEmpty) {
+      _showSnackBar("State and constituency cannot be empty");
+      return;
+    }
     setState(() => isLoading = true);
     try {
-      final updatedProfile = await ApiService().updateUserDetails(
-        name: nameController.text,
-        email: emailController.text,
+      final updatedProfile = await ApiService().patch(
+        'user-details/update',
+        {
+          'name': nameController.text,
+          'email': emailController.text,
+          'state': stateController.text,
+          'constituency': constituencyController.text,
+          if (designationController.text.isNotEmpty) 'designation': designationController.text,
+        },
       );
       logger.d("Profile updated: $updatedProfile");
       setState(() => isEditing = false);
       _showSnackBar("Profile updated successfully");
-      Navigator.pop(context, {
-        'name': nameController.text,
-        'email': emailController.text,
-      });
+      Navigator.pop(context, true);
     } catch (e) {
       logger.e("Update error: $e");
-      _showSnackBar("Failed to update profile: ${e.toString()}");
+      final errorMsg = await ErrorHandler.getErrorMessage(e);
+      _showSnackBar(errorMsg);
     } finally {
       setState(() => isLoading = false);
     }
@@ -120,9 +135,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
           _buildProfileField("Name", Icons.person, nameController, isEditable: true),
           _buildProfileField("Phone", Icons.phone, phoneController, isEditable: false),
           _buildProfileField("Email", Icons.email, emailController, isEditable: true),
-          _buildProfileField("State", Icons.location_on, stateController, isEditable: true),
-          _buildProfileField("Constituency", Icons.location_city, constituencyController, isEditable: true),
-          _buildProfileField("Referral Code", Icons.card_giftcard, referralCodeController, isEditable: true),
+          _buildStateField(),
+          _buildConstituencyField(),
+          _buildProfileField("Referral Code", Icons.card_giftcard, referralCodeController, isEditable: false),
           _buildProfileField("Designation", Icons.work, designationController, isEditable: true),
           _buildProfileField("Profile ID", Icons.badge, profileIdController, isEditable: false),
           _buildProfileField("User ID", Icons.perm_identity, userIdController, isEditable: false),
@@ -180,6 +195,79 @@ class _EditProfilePageState extends State<EditProfilePage> {
       borderSide: BorderSide(
         color: color ?? SharedColors.primaryDark,
         width: width,
+      ),
+    );
+  }
+
+  Widget _buildStateField() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("State", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          isEditing
+              ? StateDropdown(
+                  controller: stateController,
+                  onStateSelected: (stateId) {
+                    setState(() {
+                      _selectedStateId = stateId;
+                      constituencyController.clear();
+                      _selectedConstituencyId = null;
+                    });
+                  },
+                )
+              : TextField(
+                  controller: stateController,
+                  enabled: false,
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.location_on, color: Colors.grey),
+                    border: _buildBorder(SharedColors.primaryDark),
+                    enabledBorder: _buildBorder(SharedColors.primaryDark),
+                    focusedBorder: _buildBorder(SharedColors.primaryDark),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                  ),
+                ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConstituencyField() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("Constituency", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          isEditing
+              ? ConstituencyDropdown(
+                  controller: constituencyController,
+                  stateId: _selectedStateId,
+                  onConstituencySelected: (constituencyId) {
+                    setState(() {
+                      _selectedConstituencyId = constituencyId;
+                    });
+                  },
+                )
+              : TextField(
+                  controller: constituencyController,
+                  enabled: false,
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.location_city, color: Colors.grey),
+                    border: _buildBorder(SharedColors.primaryDark),
+                    enabledBorder: _buildBorder(SharedColors.primaryDark),
+                    focusedBorder: _buildBorder(SharedColors.primaryDark),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                  ),
+                ),
+        ],
       ),
     );
   }

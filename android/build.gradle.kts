@@ -5,9 +5,9 @@ buildscript {
     }
 
     dependencies {
-        classpath("com.android.tools.build:gradle:8.2.2")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24") // Updated from 1.9.20 to 1.9.24
-        classpath("com.google.gms:google-services:4.4.0") // Add Google Services plugin
+        classpath("com.android.tools.build:gradle:8.9.1")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24")
+        classpath("com.google.gms:google-services:4.4.0")
     }
 }
 

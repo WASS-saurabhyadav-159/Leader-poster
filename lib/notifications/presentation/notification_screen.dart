@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/colors.dart';
 import '../../core/network/api_service.dart';
+import '../../core/utils/error_handler.dart';
 import 'NotificationDisplay.dart';
 
 class NotificationScreen extends StatefulWidget {
@@ -34,13 +35,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
         isLoading = false;
       });
     } catch (e) {
+      final errorMsg = await ErrorHandler.getErrorMessage(e);
       setState(() {
         isLoading = false;
       });
 
       showErrorPopup(
         context,
-        "Network Error",
+        errorMsg,
             () {
           setState(() {
             isLoading = true;
@@ -100,7 +102,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 ),
                 SizedBox(height: 10),
                 Text(
-                  "Please confirm your internet connection is active.",
+                  message,
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 14, color: Colors.black54),
                 ),

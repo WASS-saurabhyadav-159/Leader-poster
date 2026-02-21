@@ -4,6 +4,7 @@ import 'package:shimmer/shimmer.dart';
 
 import '../../../../core/models/TodaySpecial.dart';
 import '../../../../core/network/api_service.dart';
+import '../../../../core/utils/error_handler.dart';
 import '../../../auth/data/RecentFinishedPoster.dart';
 import '../../../auth/presentation/VideoSection.dart';
 import '../../../category/domain/category.dart';
@@ -17,7 +18,6 @@ import '../../presentation/VideoPlayerPopup.dart';
 import 'category_highlight.dart';
 import 'home_slider.dart';
 import '../../../../config/colors.dart';
-// Add these imports for VideoSection
 
 
 class HomeScreen extends StatefulWidget {
@@ -35,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   bool _isLoading = true;
   bool _hasError = false;
   bool _initialLoadComplete = false;
+  String _errorMessage = '';
 
   @override
   bool get wantKeepAlive => true;
@@ -73,10 +74,11 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         _initialLoadComplete = true;
       });
     } catch (e) {
-      debugPrint("Error fetching data: $e");
+      final errorMsg = await ErrorHandler.getErrorMessage(e);
       setState(() {
         _isLoading = false;
         _hasError = true;
+        _errorMessage = errorMsg;
       });
     }
   }
@@ -131,8 +133,9 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           const Icon(Icons.error_outline, color: Colors.red, size: 48),
           const SizedBox(height: 16),
           Text(
-            'Failed to load data',
+            _errorMessage,
             style: Theme.of(context).textTheme.titleMedium,
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
           ElevatedButton(

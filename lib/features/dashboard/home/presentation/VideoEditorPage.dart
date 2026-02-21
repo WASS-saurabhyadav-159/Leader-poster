@@ -1,4 +1,3 @@
-// VideoEditorPage.dart
 import 'dart:async';
 import 'dart:io';
 import 'package:ffmpeg_kit_min_gpl/ffmpeg_kit.dart';
@@ -25,6 +24,8 @@ import '../../../../core/models/ProtocolImage.dart';
 import '../../../../core/models/SelfImage.dart';
 import '../../../../core/network/ImageCacheHelper.dart';
 import '../../../../core/network/api_service.dart';
+import '../../../../core/services/background_removal_service.dart';
+import '../../../../widgets/image_crop_dialog.dart';
 
 class VideoEditorPage extends StatefulWidget {
   final String videoUrl;
@@ -747,9 +748,75 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                 final picker = ImagePicker();
                 final pickedFile = await picker.pickImage(source: ImageSource.gallery);
                 if (pickedFile != null) {
-                  setState(() {
-                    _selectedImage = File(pickedFile.path);
-                  });
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => Center(
+                      child: Container(
+                        margin: EdgeInsets.symmetric(horizontal: 40),
+                        padding: EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 10,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 3,
+                                valueColor: AlwaysStoppedAnimation<Color>(SharedColors.primary),
+                              ),
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              '✨ Removing background...',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+
+                  final processedImage = await BackgroundRemovalService.removeBackground(File(pickedFile.path));
+                  Navigator.of(context).pop();
+
+                  final imageToUse = processedImage ?? File(pickedFile.path);
+                  
+                  if (processedImage == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Background removal failed. Using original image.'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+
+                  final croppedFile = await showDialog<File?>(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => ImageCropDialog(imageFile: imageToUse),
+                  );
+
+                  if (croppedFile != null) {
+                    setState(() {
+                      _selectedImage = croppedFile;
+                    });
+                  }
                 }
               },
               child: Container(

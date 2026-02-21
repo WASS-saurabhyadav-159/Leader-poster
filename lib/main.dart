@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'config/colors.dart';
 import 'core/network/local_storage.dart';
 import 'core/shared_components.dart';
+import 'core/utils/error_handler.dart';
 import 'features/auth/data/auth.dart';
 import 'features/auth/presentation/auth_screen.dart';
 import 'features/dashboard/presentation/dashboard.dart';
@@ -83,64 +84,58 @@ class _HomeState extends State<_Home> {
   }
 
   Future<void> _setupFirebaseMessaging() async {
-    // Request permission for notifications (required for Android 13+)
-    if (Platform.isAndroid) {
-      NotificationSettings settings = await _firebaseMessaging.requestPermission(
-        alert: true,
-        announcement: false,
-        badge: true,
-        carPlay: false,
-        criticalAlert: false,
-        provisional: false,
-        sound: true,
-      );
-
-      print('User granted permission: ${settings.authorizationStatus}');
-    }
-
-    // Get the FCM token
-    String? token = await _firebaseMessaging.getToken();
-    print('FCM Token: $token');
-
-    // Save token to shared preferences or send to your server
-    if (token != null) {
-      final prefs = await SharedPreferences.getInstance();
-      prefs.setString('fcm_token', token);
-      print('FCM token saved: $token');
-    }
-
-    // Handle token refresh
-    _firebaseMessaging.onTokenRefresh.listen((newToken) {
-      print('FCM Token refreshed: $newToken');
-      // Update token on your server
-      SharedPreferences.getInstance().then((prefs) {
-        prefs.setString('fcm_token', newToken);
-      });
-    });
-
-    // Handle foreground messages (app is open)
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('Got a message whilst in the foreground!');
-      print('Message data: ${message.data}');
-
-      if (message.notification != null) {
-        print('Message also contained a notification: ${message.notification}');
-        // Show local notification using flutter_local_notifications or custom dialog
-        _showLocalNotification(message);
+    try {
+      if (Platform.isAndroid) {
+        NotificationSettings settings = await _firebaseMessaging.requestPermission(
+          alert: true,
+          announcement: false,
+          badge: true,
+          carPlay: false,
+          criticalAlert: false,
+          provisional: false,
+          sound: true,
+        );
+        print('User granted permission: ${settings.authorizationStatus}');
       }
-    });
 
-    // Handle notification clicks when app is in background
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('Message clicked when app was in background: ${message.messageId}');
-      _handleNotificationClick(message);
-    });
+      String? token = await _firebaseMessaging.getToken();
+      print('FCM Token: $token');
 
-    // Handle initial notification when app is launched from terminated state
-    RemoteMessage? initialMessage = await _firebaseMessaging.getInitialMessage();
-    if (initialMessage != null) {
-      print('App launched from terminated state by notification: ${initialMessage.messageId}');
-      _handleNotificationClick(initialMessage);
+      if (token != null) {
+        final prefs = await SharedPreferences.getInstance();
+        prefs.setString('fcm_token', token);
+        print('FCM token saved: $token');
+      }
+
+      _firebaseMessaging.onTokenRefresh.listen((newToken) {
+        print('FCM Token refreshed: $newToken');
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setString('fcm_token', newToken);
+        });
+      });
+
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        print('Got a message whilst in the foreground!');
+        print('Message data: ${message.data}');
+
+        if (message.notification != null) {
+          print('Message also contained a notification: ${message.notification}');
+          _showLocalNotification(message);
+        }
+      });
+
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        print('Message clicked when app was in background: ${message.messageId}');
+        _handleNotificationClick(message);
+      });
+
+      RemoteMessage? initialMessage = await _firebaseMessaging.getInitialMessage();
+      if (initialMessage != null) {
+        print('App launched from terminated state by notification: ${initialMessage.messageId}');
+        _handleNotificationClick(initialMessage);
+      }
+    } catch (e) {
+      print('Firebase messaging setup error: $e');
     }
   }
 

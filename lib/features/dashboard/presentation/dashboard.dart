@@ -7,11 +7,15 @@ import 'package:poster/features/dashboard/presentation/profile.dart';
 import '../../../config/colors.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/network/local_storage.dart';
+import '../../../core/utils/error_handler.dart';
 import '../../../notifications/presentation/notification_screen.dart';
+import '../../../screens/subscription_screen.dart';
 import '../../auth/presentation/login.dart';
 import '../home/presentation/home.dart';
 import 'SecretScreen.dart';
 import 'downloads.dart';
+import 'dart:io';
+import 'package:dio/dio.dart';
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -70,7 +74,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
 
   final List<Map<String, String>> _navIcons = [
     {'selected': 'assets/home_selected.png', 'unselected': 'assets/home.png'},
-    {'selected': 'assets/downloads_selected.png', 'unselected': 'assets/downlode.png'},
+    {'selected': 'assets/downloads_selected.png', 'unselected': 'assets/folder.png'},
     {'selected': 'assets/profile_selected.png', 'unselected': 'assets/profile.png'},
   ];
 
@@ -235,6 +239,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    // const double _appBarIconSize = 20;
+
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Stack(
@@ -243,37 +249,111 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
             backgroundColor: SharedColors.dialogBorderColor,
             resizeToAvoidBottomInset: true,
             appBar: AppBar(
-              backgroundColor: SharedColors.buttonTextColor,
+              elevation: 0,
+              centerTitle: true,
               automaticallyImplyLeading: false,
+              leadingWidth: 130,
+              leading: Padding(
+                padding: const EdgeInsets.only(left: 12, top: 5, bottom: 10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SubscriptionScreen(),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Center(
+                      child: Column(
+                        children: [
+                          Text(
+                            'Buy Premium 👑',
+                            maxLines: 1,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            'Free',
+                            maxLines: 1,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+
+
+              /// 🔹 CENTER APP ICON
+              title: Image.asset(
+                'assets/app_icon.png',
+                height: 60,
+              ),
+
+              /// 🔹 RIGHT SIDE ICONS
               actions: [
+                /// 🔍 SEARCH
                 IconButton(
-                  iconSize: 20,
+                  iconSize: 70,
                   onPressed: () {
-                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => SecretScreen()));
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => SecretScreen()),
+                    );
                   },
                   icon: Image.asset(
                     _searchIcon,
-                    width: 20,
-                    height: 20,
+                    width: 30,
+                    height: 30,
                     color: SharedColors.primary,
                   ),
                 ),
+
+                /// 🔔 NOTIFICATION
                 IconButton(
-                  iconSize: 20,
+                  iconSize: 30,
                   onPressed: () {
                     setState(() => _isNotificationClicked = true);
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const NotificationScreen()),
-                    ).then((_) => setState(() => _isNotificationClicked = false));
+                    Navigator.of(context)
+                        .push(
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationScreen(),
+                      ),
+                    )
+                        .then((_) =>
+                        setState(() => _isNotificationClicked = false));
                   },
                   icon: Image.asset(
-                    _isNotificationClicked ? _notificationIconClicked : _notificationIcon,
-                    width: 20,
-                    height: 20,
+                    _isNotificationClicked
+                        ? _notificationIconClicked
+                        : _notificationIcon,
+                    width: 30,
+                    height: 30,
                   ),
                 ),
+
+                const SizedBox(width: 8),
               ],
             ),
+
+
+
             body: SafeArea(
               child: IndexedStack(
                 index: _selectedIndex,
