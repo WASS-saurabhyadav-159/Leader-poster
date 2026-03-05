@@ -17,7 +17,7 @@ class ImageCropDialog extends StatefulWidget {
 
 class _ImageCropDialogState extends State<ImageCropDialog> {
   final TransformationController _controller = TransformationController();
-  final GlobalKey _imageKey = GlobalKey();
+  final GlobalKey _cropFrameKey = GlobalKey();
   double _scale = 1.0;
 
   @override
@@ -29,7 +29,7 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
   Future<File?> _cropImage() async {
     try {
       RenderRepaintBoundary boundary =
-          _imageKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+          _cropFrameKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
       ui.Image image = await boundary.toImage(pixelRatio: 3.0);
       ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       Uint8List pngBytes = byteData!.buffer.asUint8List();
@@ -72,31 +72,37 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
       body: Column(
         children: [
           Expanded(
-            child: Stack(
-              children: [
-                // Image with zoom/pan
-                Center(
-                  child: InteractiveViewer(
-                    transformationController: _controller,
-                    minScale: 0.5,
-                    maxScale: 5.0,
-                    onInteractionUpdate: (details) {
-                      setState(() {
-                        _scale = _controller.value.getMaxScaleOnAxis();
-                      });
-                    },
-                    child: RepaintBoundary(
-                      key: _imageKey,
-                      child: Image.file(
-                        widget.imageFile,
-                        fit: BoxFit.contain,
+            child: Center(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Crop frame with clipped image
+                  RepaintBoundary(
+                    key: _cropFrameKey,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: MediaQuery.of(context).size.width * 0.8,
+                        height: MediaQuery.of(context).size.height * 0.6,
+                        child: InteractiveViewer(
+                          transformationController: _controller,
+                          minScale: 0.5,
+                          maxScale: 5.0,
+                          onInteractionUpdate: (details) {
+                            setState(() {
+                              _scale = _controller.value.getMaxScaleOnAxis();
+                            });
+                          },
+                          child: Image.file(
+                            widget.imageFile,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                // Crop frame overlay
-                Center(
-                  child: IgnorePointer(
+                  // Border overlay
+                  IgnorePointer(
                     child: Container(
                       width: MediaQuery.of(context).size.width * 0.8,
                       height: MediaQuery.of(context).size.height * 0.6,
@@ -167,8 +173,8 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           // Bottom controls

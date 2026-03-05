@@ -28,13 +28,29 @@ class SecretScreen extends StatefulWidget {
 
 class _SecretScreenState extends State<SecretScreen> {
   TextEditingController _searchController = TextEditingController();
-  List<Map<String, dynamic>> _posters = [];
+  FocusNode _searchFocusNode = FocusNode();
+  List<Map<String, dynamic>> _albumGroups = [];
+  List<Map<String, dynamic>> _flatPosters = [];
+  List<String> _suggestions = [];
   bool _isLoading = false;
+  bool _showSuggestions = false;
 
   @override
   void initState() {
     super.initState();
     _fetchPosters();
+    _searchFocusNode.addListener(() {
+      if (!_searchFocusNode.hasFocus) {
+        setState(() => _showSuggestions = false);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchPosters({String keyword = "", bool applyFilter = false}) async {
@@ -47,10 +63,30 @@ class _SecretScreenState extends State<SecretScreen> {
         print("Applying Filter - Selected Category ID: $categoryId");
       }
 
-      _posters = await ApiService().searchPosters(
+      _albumGroups = await ApiService().searchPosters(
         keyword: keyword,
         categoryId: categoryId,
       );
+
+      _flatPosters = [];
+      Set<String> suggestionSet = {};
+      
+      for (var group in _albumGroups) {
+        if (group['album'] != null && group['album']['name'] != null) {
+          suggestionSet.add(group['album']['name']);
+        }
+        
+        if (group['posters'] != null && group['posters'] is List) {
+          for (var poster in group['posters']) {
+            _flatPosters.add(poster);
+            if (poster['title'] != null) {
+              suggestionSet.add(poster['title']);
+            }
+          }
+        }
+      }
+      
+      _suggestions = suggestionSet.toList();
 
       setState(() => _isLoading = false);
     } catch (e) {
@@ -144,38 +180,110 @@ class _SecretScreenState extends State<SecretScreen> {
         iconTheme: IconThemeData(color: Colors.white),
         title: Text("Categories", style: TextStyle(color: Colors.white)),
         actions: [
-          IconButton(
-            icon: Icon(Icons.filter_list, color: Colors.white),
-            onPressed: () => _showFilterBottomSheet(context),
-          ),
+          // IconButton(
+          //   icon: Icon(Icons.filter_list, color: Colors.white),
+          //   onPressed: () => _showFilterBottomSheet(context),
+          // ),
         ],
       ),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) => _fetchPosters(keyword: value),
-              decoration: InputDecoration(
-                prefixIcon: Icon(Icons.search, color: Colors.white),
-                hintText: 'Search...',
-                hintStyle: TextStyle(color: Colors.white70),
-                filled: true,
-                fillColor: Colors.black,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                onChanged: (value) {
+                  _fetchPosters(keyword: value);
+                  setState(() => _showSuggestions = value.isNotEmpty);
+                },
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w500,
+                ),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Colors.grey,
+                  ),
+                  hintText: 'Search posters...',
+                  hintStyle: const TextStyle(
+                    color: Colors.grey,
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 16,
+                    horizontal: 20,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade300,
+                      width: 1,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(
+                      color: Colors.red, // 🔥 Theme highlight
+                      width: 1.8,
+                    ),
+                  ),
                 ),
               ),
-              style: TextStyle(color: Colors.white),
             ),
           ),
+          if (_showSuggestions && _suggestions.isNotEmpty)
+            Container(
+              constraints: BoxConstraints(maxHeight: 200),
+              margin: EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _suggestions.length > 5 ? 5 : _suggestions.length,
+                itemBuilder: (context, index) {
+                  final suggestion = _suggestions[index];
+                  return ListTile(
+                    dense: true,
+                    leading: Icon(Icons.search, size: 20, color: Colors.grey),
+                    title: Text(suggestion, style: TextStyle(fontSize: 14)),
+                    onTap: () {
+                      _searchController.text = suggestion;
+                      _fetchPosters(keyword: suggestion);
+                      setState(() => _showSuggestions = false);
+                      _searchFocusNode.unfocus();
+                    },
+                  );
+                },
+              ),
+            ),
           Expanded(
             child: _isLoading
                 ? Center(child: CircularProgressIndicator())
-                : _posters.isEmpty
-                ? Center(child: Text("No posters found", style: TextStyle(color: Colors.white)))
+                : _flatPosters.isEmpty
+                ? Center(child: Text("No posters found", style: TextStyle(color: Colors.grey)))
                 : GridView.builder(
               padding: const EdgeInsets.all(8.0),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -183,9 +291,9 @@ class _SecretScreenState extends State<SecretScreen> {
                 crossAxisSpacing: 8.0,
                 mainAxisSpacing: 8.0,
               ),
-              itemCount: _posters.length,
+              itemCount: _flatPosters.length,
               itemBuilder: (context, index) {
-                final poster = _posters[index];
+                final poster = _flatPosters[index];
                 String imageUrl = poster["poster"] ?? "assets/images/category_p2.png";
                 return GestureDetector(
                   onTap: () {

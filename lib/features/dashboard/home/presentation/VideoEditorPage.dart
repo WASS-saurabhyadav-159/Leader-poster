@@ -4,6 +4,7 @@ import 'package:ffmpeg_kit_min_gpl/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_min_gpl/ffmpeg_kit_config.dart';
 import 'package:ffmpeg_kit_min_gpl/return_code.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
 import 'package:video_player/video_player.dart';
 import 'package:image_picker/image_picker.dart';
@@ -25,6 +26,7 @@ import '../../../../core/models/SelfImage.dart';
 import '../../../../core/network/ImageCacheHelper.dart';
 import '../../../../core/network/api_service.dart';
 import '../../../../core/services/background_removal_service.dart';
+import '../../../../screens/subscription_screen.dart';
 import '../../../../widgets/image_crop_dialog.dart';
 
 class VideoEditorPage extends StatefulWidget {
@@ -94,6 +96,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
   @override
   void initState() {
     super.initState();
+    _enableScreenshotProtection();
     print('VideoEditorPage - Video URL from previous page: ${widget.videoUrl}');
     print('VideoEditorPage - Initial position: ${widget.initialPosition}');
     print('VideoEditorPage - topDefNum: ${widget.topDefNum}, selfDefNum: ${widget.selfDefNum}, bottomDefNum: ${widget.bottomDefNum}');
@@ -104,6 +107,28 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
 
     // 🔥 Start pre-caching immediately
     _preloadCriticalImages();
+  }
+
+  Future<void> _enableScreenshotProtection() async {
+    if (Platform.isAndroid) {
+      try {
+        const platform = MethodChannel('com.leaderposter.poster/secure');
+        await platform.invokeMethod('setSecureFlag', {'enable': true});
+      } catch (e) {
+        print('Error enabling screenshot protection: $e');
+      }
+    }
+  }
+
+  Future<void> _disableScreenshotProtection() async {
+    if (Platform.isAndroid) {
+      try {
+        const platform = MethodChannel('com.leaderposter.poster/secure');
+        await platform.invokeMethod('setSecureFlag', {'enable': false});
+      } catch (e) {
+        print('Error disabling screenshot protection: $e');
+      }
+    }
   }
 
   Future<void> _preloadCriticalImages() async {
@@ -721,19 +746,67 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(6),
-                              child: isLoading
-                                  ? _buildLoader()
-                                  : cachedImage != null
-                                  ? Image.file(
-                                cachedImage,
-                                fit: BoxFit.cover,
-                              )
-                                  : _selfImageCache[image.imageUrl] != null
-                                  ? Image.file(
-                                _selfImageCache[image.imageUrl]!,
-                                fit: BoxFit.cover,
-                              )
-                                  : _buildFallbackImage(image.imageUrl),
+                              child: Stack(
+                                children: [
+                                  isLoading
+                                      ? _buildLoader()
+                                      : cachedImage != null
+                                      ? Image.file(cachedImage, fit: BoxFit.cover)
+                                      : _selfImageCache[image.imageUrl] != null
+                                      ? Image.file(_selfImageCache[image.imageUrl]!, fit: BoxFit.cover)
+                                      : _buildFallbackImage(image.imageUrl),
+                                  if (isSelected)
+                                    Positioned(
+                                      top: 4,
+                                      right: 4,
+                                      child: Container(
+                                        padding: EdgeInsets.all(2),
+                                        decoration: BoxDecoration(
+                                          color: SharedColors.primary,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(Icons.check, color: Colors.white, size: 12),
+                                      ),
+                                    ),
+                                  if (image.uploadedBy == 'USER')
+                                    Positioned(
+                                      bottom: 4,
+                                      right: 4,
+                                      child: GestureDetector(
+                                        onTap: () async {
+                                          final shouldDelete = await showDialog<bool>(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                              title: const Text('Delete Image'),
+                                              content: const Text('Are you sure you want to delete this image?'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(context, false),
+                                                  child: const Text('Cancel'),
+                                                ),
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(context, true),
+                                                  child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (shouldDelete == true) {
+                                            await _deleteSelfImage(image.id);
+                                          }
+                                        },
+                                        child: Container(
+                                          padding: EdgeInsets.all(3),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(Icons.delete, color: Colors.white, size: 12),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
                         );
@@ -744,81 +817,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
               ),
             ),
             GestureDetector(
-              onTap: () async {
-                final picker = ImagePicker();
-                final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-                if (pickedFile != null) {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => Center(
-                      child: Container(
-                        margin: EdgeInsets.symmetric(horizontal: 40),
-                        padding: EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black26,
-                              blurRadius: 10,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 40,
-                              height: 40,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 3,
-                                valueColor: AlwaysStoppedAnimation<Color>(SharedColors.primary),
-                              ),
-                            ),
-                            SizedBox(height: 16),
-                            Text(
-                              '✨ Removing background...',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-
-                  final processedImage = await BackgroundRemovalService.removeBackground(File(pickedFile.path));
-                  Navigator.of(context).pop();
-
-                  final imageToUse = processedImage ?? File(pickedFile.path);
-                  
-                  if (processedImage == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Background removal failed. Using original image.'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  }
-
-                  final croppedFile = await showDialog<File?>(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => ImageCropDialog(imageFile: imageToUse),
-                  );
-
-                  if (croppedFile != null) {
-                    setState(() {
-                      _selectedImage = croppedFile;
-                    });
-                  }
-                }
-              },
+              onTap: _pickAndAddImage,
               child: Container(
                 width: 60,
                 height: 60,
@@ -1467,6 +1466,10 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
   void _startVideoProcessing() async {
     if (_isProcessing) return;
 
+    // Check subscription before processing
+    final canGenerate = await _checkVideoSubscription();
+    if (!canGenerate) return;
+
     setState(() {
       _isProcessing = true;
       _progressValue = 0.1;
@@ -1508,6 +1511,110 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
         SnackBar(content: Text('Error processing video: $e')),
       );
     }
+  }
+
+  Future<bool> _checkVideoSubscription() async {
+    try {
+      final data = await ApiService().getProfile();
+      final plan = data['plan'];
+      final subscriptionTo = data['subscriptionTo'];
+
+      // Case 1 & 2: No plan or expired subscription
+      if (plan == null || subscriptionTo == null) {
+        _showSubscriptionDialog();
+        return false;
+      }
+
+      final expiryDate = DateTime.parse(subscriptionTo);
+      final today = DateTime.now();
+      final todayDate = DateTime(today.year, today.month, today.day);
+      final expiryDateOnly = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
+
+      if (todayDate.isAfter(expiryDateOnly)) {
+        _showSubscriptionDialog();
+        return false;
+      }
+
+      // Case 3 & 4: Valid subscription with null or 'video' accessType
+      final accessType = plan['accessType'];
+      if (accessType == null || accessType == 'video') {
+        return true;
+      }
+
+      // Case 5: Valid subscription but accessType is 'image'
+      if (accessType == 'image') {
+        _showAccessDeniedDialog();
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      _showSubscriptionDialog();
+      return false;
+    }
+  }
+
+  void _showSubscriptionDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Subscription Required'),
+        content: const Text('You don\'t have an active subscription. Please subscribe to generate videos.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SharedColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SubscriptionScreen()),
+              );
+            },
+            child: const Text('Subscribe', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAccessDeniedDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Access Denied'),
+        content: const Text('Your current plan only allows image generation. Please upgrade to generate videos.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SharedColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SubscriptionScreen()),
+              );
+            },
+            child: const Text('Upgrade', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _shareVideo(String platform) async {
@@ -1847,8 +1954,230 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
     );
   }
 
+  Future<void> _pickAndAddImage() async {
+    final shouldProceed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Upload Image', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text('Please upload images with a plain background for better results.', style: TextStyle(fontSize: 16)),
+            SizedBox(height: 8),
+            Text('మంచి ఫలితాల కోసం ప్లేన్ బ్యాక్గ్రౌండ్ ఉన్న ఫోటోలను అప్లోడ్ చేయండి.', style: TextStyle(fontSize: 15)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SharedColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('OK', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldProceed != true) return;
+
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Center(
+          child: Container(
+            margin: EdgeInsets.symmetric(horizontal: 40),
+            padding: EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation<Color>(SharedColors.primary),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text('✨ Removing background...', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.black87)),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final processedImage = await BackgroundRemovalService.removeBackground(File(pickedFile.path));
+      Navigator.of(context).pop();
+
+      final imageToUse = processedImage ?? File(pickedFile.path);
+      
+      if (processedImage == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Background removal failed. Using original image.'), duration: Duration(seconds: 2)),
+        );
+      }
+
+      final croppedFile = await showDialog<File?>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => ImageCropDialog(imageFile: imageToUse),
+      );
+
+      if (croppedFile != null) {
+        final selectedPosition = await _showPositionDialog();
+        if (selectedPosition != null) {
+          await _uploadSelfImage(croppedFile, selectedPosition);
+        }
+      }
+    }
+  }
+
+  Future<String?> _showPositionDialog() async {
+    return await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Select Position', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Where would you like to place your image on the video?', textAlign: TextAlign.center, style: TextStyle(fontSize: 14)),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: SharedColors.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => Navigator.pop(context, 'left'),
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    label: const Text('Left', style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: SharedColors.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => Navigator.pop(context, 'right'),
+                    icon: const Icon(Icons.arrow_forward, color: Colors.white),
+                    label: const Text('Right', style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _uploadSelfImage(File imageFile, String position) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: Container(
+          margin: EdgeInsets.symmetric(horizontal: 40),
+          padding: EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(SharedColors.primary),
+                ),
+              ),
+              SizedBox(height: 16),
+              Text('📤 Uploading image...', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.black87)),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final response = await ApiService().uploadSelfImage(imageFile, position);
+      Navigator.of(context).pop();
+
+      if (response != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image uploaded successfully!'), backgroundColor: Colors.green),
+        );
+        await _loadApiSelfImages();
+      }
+    } catch (e) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to upload image: ${e.toString()}'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _deleteSelfImage(String imageId) async {
+    try {
+      await ApiService().deleteSelfImage(imageId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Image deleted successfully!'), backgroundColor: Colors.green),
+      );
+      setState(() {
+        _apiSelfImages.removeWhere((img) => img.id == imageId);
+        _selfImageCache.removeWhere((key, value) {
+          final img = _apiSelfImages.firstWhere((i) => i.imageUrl == key, orElse: () => _apiSelfImages.first);
+          return img.id == imageId;
+        });
+        if (_selectedImage != null) {
+          final matchingImage = _apiSelfImages.firstWhere(
+            (img) => _selfImageCache[img.imageUrl] == _selectedImage,
+            orElse: () => _apiSelfImages.isNotEmpty ? _apiSelfImages.first : SelfImage(id: '', accountId: '', imageUrl: '', imagePath: '', position: '', uploadedBy: '', defNum: 0, createdAt: DateTime.now(), updatedAt: DateTime.now()),
+          );
+          if (_selfImageCache[matchingImage.imageUrl] == _selectedImage) {
+            _selectedImage = null;
+          }
+        }
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete image: ${e.toString()}'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   void dispose() {
+    _disableScreenshotProtection();
     try {
       _controller.dispose();
     } catch (e) {

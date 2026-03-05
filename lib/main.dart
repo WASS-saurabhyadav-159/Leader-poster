@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:poster/startup/presentation/onboarding.dart';
 import 'package:provider/provider.dart';
@@ -37,6 +38,11 @@ void main() async {
   // Initialize Firebase
   await Firebase.initializeApp();
 
+  // Initialize Analytics and log
+  final analytics = FirebaseAnalytics.instance;
+  await analytics.logAppOpen();
+  print('✅ Firebase Analytics initialized successfully');
+
   // Set up background message handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
@@ -45,6 +51,9 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
+  static FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+  static FirebaseAnalyticsObserver observer = FirebaseAnalyticsObserver(analytics: analytics);
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +64,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: SharedColors.primary),
         useMaterial3: true,
       ),
+      navigatorObservers: [observer],
       initialRoute: '/',
       routes: {
         '/': (context) => const _Home(),

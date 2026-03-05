@@ -1754,6 +1754,7 @@ import 'dart:ui';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lottie/lottie.dart';
 import 'package:path_provider/path_provider.dart';
@@ -1761,6 +1762,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as path;
 import 'package:photo_manager/photo_manager.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:poster/core/network/api_constants.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1769,7 +1771,9 @@ import '../../../core/models/FooterImage.dart';
 import '../../../core/models/ProtocolImage.dart';
 import '../../../core/models/SelfImage.dart';
 import '../../../core/network/api_service.dart';
+import '../../../core/network/local_storage.dart';
 import '../../../core/services/background_removal_service.dart';
+import '../../../screens/subscription_screen.dart';
 import '../../../widgets/image_crop_dialog.dart';
 
 // Update the constructor of SocialMediaDetailsPage
@@ -1874,10 +1878,28 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
     print('Received selfDefNum: $selfNum');
     print('Received bottomDefNum: $bottomNum');
 
+    _setSecureFlag(true);
     _fetchUserProfile();
     _loadApiSelfImages();
     _loadProtocolImages();
     _loadFooterImages();
+  }
+
+  @override
+  void dispose() {
+    _setSecureFlag(false);
+    super.dispose();
+  }
+
+  Future<void> _setSecureFlag(bool enable) async {
+    if (Platform.isAndroid) {
+      try {
+        const platform = MethodChannel('com.leaderposter.poster/secure');
+        await platform.invokeMethod('setSecureFlag', {'enable': enable});
+      } catch (e) {
+        print('Error setting secure flag: $e');
+      }
+    }
   }
 
 
@@ -2037,47 +2059,28 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
 
   Future<void> _fetchUserProfile() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
+      final data = await ApiService().getProfile();
+      final userDetail = data['userDetail'];
 
-      if (token == null) {
-        setState(() => _isLoading = false);
-        return;
-      }
+      setState(() {
+        _adminTopBannerUrl = userDetail['top'];
+        _adminBottomImageUrl = userDetail['profile'];
+        _adminName = userDetail['adminAssignName'];
+        _adminDesignation = userDetail['designation'];
 
-      final dio = Dio();
-      final response = await dio.get(
-        'https://apiserverdata.leaderposter.com/api/v1/account/user/profile',
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
-      );
+        if (widget.bottomDefNum == null || widget.bottomDefNum! <= 0) {
+          _selectedFooterImageUrl = userDetail["bottom"];
+        }
 
-      if (response.statusCode == 200) {
-        final data = response.data;
-        final userDetail = data['userDetail'];
+        if (_adminName != null && _adminName!.isNotEmpty) {
+          _name = _adminName!;
+        }
+        if (_adminDesignation != null && _adminDesignation!.isNotEmpty) {
+          _designation = _adminDesignation!;
+        }
 
-        setState(() {
-          _adminTopBannerUrl = userDetail['top'];
-          _adminBottomImageUrl = userDetail['profile'];
-          _adminName = userDetail['adminAssignName'];
-          _adminDesignation = userDetail['designation'];
-
-          // Only use admin footer image if bottomDefNum is not specified (0 or negative)
-          if (widget.bottomDefNum == null || widget.bottomDefNum! <= 0) {
-            _selectedFooterImageUrl = userDetail["bottom"];
-          }
-
-          if (_adminName != null && _adminName!.isNotEmpty) {
-            _name = _adminName!;
-          }
-          if (_adminDesignation != null && _adminDesignation!.isNotEmpty) {
-            _designation = _adminDesignation!;
-          }
-
-          _isLoading = false;
-        });
-      } else {
-        setState(() => _isLoading = false);
-      }
+        _isLoading = false;
+      });
     } catch (e) {
       setState(() => _isLoading = false);
     }
@@ -2085,71 +2088,20 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
 
   Future<void> _increaseCount() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token')?.trim();
-
-      if (token == null || token.isEmpty) {
-        print('❌ Authentication token missing or empty');
-        return;
-      }
-
-      if (widget.categoryId.isEmpty || widget.posterId.isEmpty) {
-        print('❌ Missing required IDs - Category: ${widget.categoryId}, Poster: ${widget.posterId}');
-        return;
-      }
-
-      final dio = Dio(BaseOptions(
-        baseUrl: 'https://apiserverdata.leaderposter.com/api/v1/',
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 5),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      ));
-
-      dio.interceptors.add(LogInterceptor(
-        request: true,
-        requestHeader: true,
-        requestBody: true,
-        responseHeader: true,
-        responseBody: true,
-      ));
-
-      print('📤 Making POST request to increase count');
-      print('   Category ID: ${widget.categoryId}');
-      print('   Poster ID: ${widget.posterId}');
-      print('   Token prefix: ${token.substring(0, 8)}...');
-
-      final response = await dio.post(
-        'category/increase-count',
-        queryParameters: {
-          'categoryId': widget.categoryId,
-          'posterId': widget.posterId,
-        },
+      await ApiService().increaseCount(
+        categoryId: widget.categoryId,
+        posterId: widget.posterId,
       );
-
-      if (response.statusCode == 200) {
-        print('✅ Count increased successfully! Response: ${response.data}');
-      } else {
-        print('⚠️ Unexpected response: ${response.statusCode}');
-        print('   Response data: ${response.data}');
-      }
-    } on DioException catch (e) {
-      print('🔥 Dio Error: ${e.type}');
-      print('   Message: ${e.message}');
-
-      if (e.response != null) {
-        print('   Status: ${e.response?.statusCode}');
-        print('   Data: ${e.response?.data}');
-        print('   Headers: ${e.response?.headers}');
-      }
+      print('✅ Count increased successfully');
     } catch (e) {
-      print('💥 Unexpected error: $e');
+      print('❌ Failed to increase count: $e');
     }
   }
 
   Future<void> _generateImageWithLoader() async {
+    final canGenerate = await _checkSubscription();
+    if (!canGenerate) return;
+
     setState(() {
       _isGenerating = true;
       _generationProgress = 0.0;
@@ -2173,6 +2125,88 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
       _showGeneratedImagePopup(_generatedImage!);
       _showDownloadSuccessPopup();
     }
+  }
+
+  Future<bool> _checkSubscription() async {
+    try {
+      final data = await ApiService().getProfile();
+      final plan = data['plan'];
+      final subscriptionTo = data['subscriptionTo'];
+
+      print('📋 Plan: $plan');
+      print('📅 SubscriptionTo: $subscriptionTo');
+
+      if (plan == null || subscriptionTo == null) {
+        print('❌ Plan or subscriptionTo is null');
+        _showSubscriptionDialog();
+        return false;
+      }
+
+      final expiryDate = DateTime.parse(subscriptionTo);
+      final today = DateTime.now();
+      final todayDate = DateTime(today.year, today.month, today.day);
+      final expiryDateOnly = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
+      
+      print('📅 Today: $todayDate');
+      print('📅 Expiry: $expiryDateOnly');
+      print('📅 Is expired: ${todayDate.isAfter(expiryDateOnly)}');
+      
+      if (todayDate.isAfter(expiryDateOnly)) {
+        print('❌ Subscription expired');
+        _showSubscriptionDialog();
+        return false;
+      }
+
+      print('✅ Subscription valid');
+      return true;
+    } catch (e) {
+      print('❌ Error in subscription check: $e');
+      _showSubscriptionDialog();
+      return false;
+    }
+  }
+
+  bool _isSubscriptionDialogShown = false;
+
+  void _showSubscriptionDialog() {
+    if (_isSubscriptionDialogShown) return;
+    _isSubscriptionDialogShown = true;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Subscription Required'),
+        content: const Text('Your subscription has expired or is not active. Please subscribe to continue generating images.'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _isSubscriptionDialogShown = false;
+            },
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SharedColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              _isSubscriptionDialogShown = false;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SubscriptionScreen(),
+                ),
+              );
+            },
+            child: const Text('Subscribe', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    ).then((_) => _isSubscriptionDialogShown = false);
   }
 
   // Update the image upload method to clear selections
@@ -2707,7 +2741,7 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
   Widget _buildImageRow() {
     const double imageBoxSize = 60.0;
     const double boxSpacing = 8.0;
-    
+
     // Combine backend images first, then uploaded images
     final List<dynamic> allImages = [
       ..._filteredSelfImages,
@@ -2829,7 +2863,7 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
                             width: imageBoxSize,
                             height: imageBoxSize,
                           ),
-                        
+
                         // Selection checkmark
                         if (isSelected)
                           Positioned(
@@ -2848,21 +2882,36 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
                               ),
                             ),
                           ),
-                        
-                        // Delete icon for uploaded images only
-                        if (!isBackendImage)
+
+                        // Delete icon for USER uploaded images only
+                        if (isBackendImage && (item as SelfImage).uploadedBy == 'USER')
                           Positioned(
                             bottom: 4,
                             right: 4,
                             child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  final file = item as File;
-                                  _uploadedImages.remove(file);
-                                  if (_selectedUploadedImage?.path == file.path) {
-                                    _selectedUploadedImage = null;
-                                  }
-                                });
+                              onTap: () async {
+                                final selfImage = item as SelfImage;
+                                final shouldDelete = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Delete Image'),
+                                    content: const Text('Are you sure you want to delete this image?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, true),
+                                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                
+                                if (shouldDelete == true) {
+                                  await _deleteSelfImage(selfImage.id);
+                                }
                               },
                               child: Container(
                                 padding: EdgeInsets.all(3),
@@ -2898,9 +2947,9 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
         width: 60,
         height: 60,
         decoration: BoxDecoration(
-          color: Colors.grey,
+          color: Colors.red,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey[400]!),
+          border: Border.all(color: Colors.red[700]!),
         ),
         child: const Icon(Icons.add, color: Colors.white, size: 20),
       ),
@@ -3032,18 +3081,275 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
         builder: (context) => ImageCropDialog(imageFile: imageToUse),
       );
 
-      // Add to list if user confirmed crop
+      // If user confirmed crop, ask for position
       if (croppedFile != null) {
+        final selectedPosition = await _showPositionDialog();
+        
+        if (selectedPosition != null) {
+          // Upload to API
+          await _uploadSelfImage(croppedFile, selectedPosition);
+        }
+      }
+    }
+  }
+
+  Future<String?> _showPositionDialog() async {
+    return await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Select Position',
+          style: TextStyle(fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Where would you like to place your image on the poster?',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: SharedColors.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () => Navigator.pop(context, 'left'),
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    label: const Text(
+                      'Left',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: SharedColors.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () => Navigator.pop(context, 'right'),
+                    icon: const Icon(Icons.arrow_forward, color: Colors.white),
+                    label: const Text(
+                      'Right',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _uploadSelfImage(File imageFile, String position) async {
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: Container(
+          margin: EdgeInsets.symmetric(horizontal: 40),
+          padding: EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(SharedColors.primary),
+                ),
+              ),
+              SizedBox(height: 16),
+              Text(
+                '📤 Uploading image...',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final token = await getToken();
+      
+      print('🔑 Token retrieved: ${token != null ? "Found" : "Not found"}');
+      
+      if (token == null) {
+        Navigator.of(context).pop(); // Close loading
+        throw Exception('No authentication token found');
+      }
+
+      final dio = Dio();
+      
+      String fileName = path.basename(imageFile.path);
+      String positionUpper = position.toUpperCase();
+      
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(
+          imageFile.path,
+          filename: fileName,
+        ),
+        'position': positionUpper,
+      });
+
+      print('📤 Uploading to: ${ApiConstants.baseUrl}self-image/user');
+      print('📍 Position (original): $position');
+      print('📍 Position (uppercase): $positionUpper');
+      print('📄 File name: $fileName');
+      print('🔐 Token: ${token.substring(0, 20)}...');
+
+      final response = await dio.post(
+        '${ApiConstants.baseUrl}self-image/user',
+        data: formData,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      print('📤 Upload Response Status: ${response.statusCode}');
+      print('📦 Upload Response Data: ${response.data}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Image uploaded successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Parse response and create SelfImage object
+        final responseData = response.data;
+        final uploadedImage = SelfImage(
+          id: responseData['id'],
+          accountId: responseData['accountId'],
+          imageUrl: responseData['image'],
+          imagePath: responseData['imagePath'],
+          position: responseData['position'],
+          uploadedBy: responseData['uploadedBy'] ?? 'USER',
+          defNum: responseData['defNum'] ?? 0,
+          createdAt: DateTime.parse(responseData['createdAt']),
+          updatedAt: DateTime.parse(responseData['updatedAt']),
+        );
+        
+        print('✅ Created SelfImage object: ${uploadedImage.imageUrl}');
+        
+        // Reload all self images from API to get fresh data
+        await _loadApiSelfImages();
+        
+        // Update state with the new image
         setState(() {
-          _uploadedImages.add(croppedFile);
-          _selectedUploadedImage = croppedFile;
-          _selectedAssetImage = null;
-          _selectedApiImageUrl = null;
+          _selectedSelfImage = uploadedImage;
+          _selectedApiImageUrl = uploadedImage.imageUrl;
           _selectedSelfImageUrls.clear();
-          _selectedSelfImage = null;
-          _updatePosition('right');
+          _selectedSelfImageUrls.add(uploadedImage.imageUrl);
+          _updatePosition(uploadedImage.position);
+        });
+        
+        print('✅ State updated successfully');
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      print('❌ Error uploading self image: $e');
+      
+      if (e is DioException) {
+        print('🔍 DioException details:');
+        print('   Type: ${e.type}');
+        print('   Message: ${e.message}');
+        print('   Response status: ${e.response?.statusCode}');
+        print('   Response data: ${e.response?.data}');
+        print('   Response headers: ${e.response?.headers}');
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload image: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteSelfImage(String imageId) async {
+    try {
+      final token = await getToken();
+      if (token == null) throw Exception('No authentication token found');
+
+      final dio = Dio();
+      final response = await dio.delete(
+        '${ApiConstants.baseUrl}self-image/remove/user/$imageId',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Image deleted successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        setState(() {
+          _apiSelfImages.removeWhere((img) => img.id == imageId);
+          _filteredSelfImages.removeWhere((img) => img.id == imageId);
+          if (_selectedSelfImage?.id == imageId) {
+            _selectedSelfImage = null;
+            _selectedApiImageUrl = null;
+            _selectedSelfImageUrls.clear();
+          }
         });
       }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to delete image: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -4011,3 +4317,4 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
   }
 
 }
+

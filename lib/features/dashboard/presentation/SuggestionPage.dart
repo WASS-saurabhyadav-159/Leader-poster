@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import '../../../config/colors.dart';
 import '../../../core/network/api_service.dart';
 
@@ -14,13 +15,62 @@ class SuggestionPage extends StatefulWidget {
 class _SuggestionPageState extends State<SuggestionPage> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _eventDateController = TextEditingController();
 
   final ImagePicker _picker = ImagePicker();
   final ApiService _apiService = ApiService();
   File? _selectedImage;
+  DateTime? _selectedDate;
 
   bool isLoading = false;
   int maxLength = 300;
+  int _charCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _descriptionController.addListener(() {
+      setState(() {
+        _charCount = _descriptionController.text.length;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.removeListener(() {});
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _eventDateController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFFE50914),
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+        _eventDateController.text = DateFormat('dd/MM/yyyy').format(picked);
+      });
+    }
+  }
 
   Future<void> _pickImage() async {
     final XFile? image =
@@ -100,7 +150,7 @@ class _SuggestionPageState extends State<SuggestionPage> {
                     SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        "We Value Your Ideas!\nHelp us improve your experience.",
+                        "Not able to find poster for a event ?\nLet us know, Our team will update it.",
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -116,7 +166,7 @@ class _SuggestionPageState extends State<SuggestionPage> {
 
               /// Title
               const Text(
-                "Suggestion Title",
+                "Event Title",
                 style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: Colors.black),
@@ -125,7 +175,7 @@ class _SuggestionPageState extends State<SuggestionPage> {
               TextField(
                 controller: _titleController,
                 decoration: InputDecoration(
-                  hintText: "Enter title",
+                  hintText: "Enter Event Title",
                   focusedBorder: OutlineInputBorder(
                     borderSide: const BorderSide(
                         color: Color(0xFFE50914), width: 2),
@@ -143,7 +193,7 @@ class _SuggestionPageState extends State<SuggestionPage> {
 
               /// Description
               const Text(
-                "Description",
+                "Event Description",
                 style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: Colors.black),
@@ -155,8 +205,50 @@ class _SuggestionPageState extends State<SuggestionPage> {
                 maxLines: 5,
                 decoration: InputDecoration(
                   hintText: "Write your suggestion...",
-                  counterText:
-                  "${_descriptionController.text.length}/$maxLength",
+                  counterText: "",
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: const BorderSide(
+                        color: Color(0xFFE50914), width: 2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                        color: Colors.grey.shade300, width: 1.5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    "$_charCount/$maxLength",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              /// Event Date
+              const Text(
+                "Event Date",
+                style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _eventDateController,
+                readOnly: true,
+                onTap: _selectDate,
+                decoration: InputDecoration(
+                  hintText: "Select Event Date",
+                  suffixIcon: const Icon(Icons.calendar_today, color: Color(0xFFE50914)),
                   focusedBorder: OutlineInputBorder(
                     borderSide: const BorderSide(
                         color: Color(0xFFE50914), width: 2),
@@ -351,10 +443,11 @@ class _SuggestionPageState extends State<SuggestionPage> {
         ),
       );
 
-      // Auto close dialog after 3 seconds
+      // Auto close dialog after 3 seconds and navigate back
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
-          Navigator.of(context).pop();
+          Navigator.of(context).pop(); // Close dialog
+          Navigator.of(context).pop(); // Navigate to previous page
         }
       });
 

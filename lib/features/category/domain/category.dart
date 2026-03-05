@@ -2,14 +2,16 @@ class Category {
   final String id;
   final String name;
   final List<Poster> posters;
-  final String? date; // Added date field
-  final DateTime? createdAt; // Added createdAt field
-  final DateTime? updatedAt; // Added updatedAt field
+  final List<PosterGroup> posterGroups;
+  final String? date;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   Category({
     required this.id,
     required this.name,
     required this.posters,
+    required this.posterGroups,
     this.date,
     this.createdAt,
     this.updatedAt,
@@ -22,25 +24,62 @@ class Category {
       posters: (json['posters'] as List<dynamic>? ?? [])
           .map((posterJson) => Poster.fromJson(posterJson))
           .toList(),
-      date: json['date']?.toString(), // Parse date from API
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'].toString())
+      posterGroups: (json['posterGroups'] as List<dynamic>? ?? [])
+          .map((groupJson) => PosterGroup.fromJson(groupJson))
+          .toList(),
+      date: json['date']?.toString(),
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())
           : null,
-      updatedAt: json['updated_at'] != null
-          ? DateTime.tryParse(json['updated_at'].toString())
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.tryParse(json['updatedAt'].toString())
           : null,
     );
   }
 
-  // Optional: Add toJson method if needed for API calls
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'name': name,
       'posters': posters.map((poster) => poster.toJson()).toList(),
+      'posterGroups': posterGroups.map((group) => group.toJson()).toList(),
       'date': date,
-      'created_at': createdAt?.toIso8601String(),
-      'updated_at': updatedAt?.toIso8601String(),
+      'createdAt': createdAt?.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
+    };
+  }
+}
+
+class PosterGroup {
+  final String albumId;
+  final String albumName;
+  final String albumDate;
+  final List<Poster> posters;
+
+  PosterGroup({
+    required this.albumId,
+    required this.albumName,
+    required this.albumDate,
+    required this.posters,
+  });
+
+  factory PosterGroup.fromJson(Map<String, dynamic> json) {
+    return PosterGroup(
+      albumId: json['albumId']?.toString() ?? '',
+      albumName: json['albumName']?.toString() ?? '',
+      albumDate: json['albumDate']?.toString() ?? '',
+      posters: (json['posters'] as List<dynamic>? ?? [])
+          .map((posterJson) => Poster.fromJson(posterJson))
+          .toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'albumId': albumId,
+      'albumName': albumName,
+      'albumDate': albumDate,
+      'posters': posters.map((poster) => poster.toJson()).toList(),
     };
   }
 }
@@ -77,13 +116,13 @@ class Poster {
       specialDay: json['special_day'] != null
           ? SpecialDay.fromJson(json['special_day'])
           : null,
-      videoThumb: json['video_thumb']?.toString(),
-      isVideo: json['is_video'] == true || (json['type']?.toString() == 'video'),
+      videoThumb: json['video_thumb']?.toString() ?? json['videoThumb']?.toString(),
+      isVideo: json['is_video'] == true || (json['type']?.toString() == 'video') || json['videoThumb'] != null,
       date: json['date']?.toString(),
       position: json['position']?.toString(),
-      topDefNum: _parseInt(json['top_def_num']),
-      selfDefNum: _parseInt(json['self_def_num']),
-      bottomDefNum: _parseInt(json['bottom_def_num']),
+      topDefNum: _parseInt(json['top_def_num'] ?? json['topDefNum']),
+      selfDefNum: _parseInt(json['self_def_num'] ?? json['selfDefNum']),
+      bottomDefNum: _parseInt(json['bottom_def_num'] ?? json['bottomDefNum']),
     );
   }
 

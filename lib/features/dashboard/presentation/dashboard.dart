@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:logger/logger.dart';
 import 'package:lottie/lottie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +12,7 @@ import '../../../core/utils/error_handler.dart';
 import '../../../notifications/presentation/notification_screen.dart';
 import '../../../screens/subscription_screen.dart';
 import '../../auth/presentation/login.dart';
+import '../home/presentation/all_categories_page.dart';
 import '../home/presentation/home.dart';
 import 'SecretScreen.dart';
 import 'downloads.dart';
@@ -41,7 +43,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
 
   final List<Widget> _screens = [
     const HomeScreen(),
-    FileSelectionScreen(),
+    AllAlbumsListPage(),
     ProfileScreen(),
   ];
 
@@ -72,12 +74,11 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     ),
   ];
 
-  final List<Map<String, String>> _navIcons = [
-    {'selected': 'assets/home_selected.png', 'unselected': 'assets/home.png'},
-    {'selected': 'assets/downloads_selected.png', 'unselected': 'assets/folder.png'},
-    {'selected': 'assets/profile_selected.png', 'unselected': 'assets/profile.png'},
+  final List<IconData> _navIcons = [
+    FontAwesomeIcons.house,
+    FontAwesomeIcons.folder,
+    FontAwesomeIcons.user,
   ];
-
   final String _notificationIcon = 'assets/alarm.png';
   final String _notificationIconClicked = 'assets/notification_selected.png';
   final String _searchIcon = 'assets/search.png';
@@ -310,20 +311,20 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
               /// 🔹 RIGHT SIDE ICONS
               actions: [
                 /// 🔍 SEARCH
-                IconButton(
-                  iconSize: 70,
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => SecretScreen()),
-                    );
-                  },
-                  icon: Image.asset(
-                    _searchIcon,
-                    width: 30,
-                    height: 30,
-                    color: SharedColors.primary,
-                  ),
-                ),
+                // IconButton(
+                //   iconSize: 70,
+                //   onPressed: () {
+                //     Navigator.of(context).push(
+                //       MaterialPageRoute(builder: (_) => SecretScreen()),
+                //     );
+                //   },
+                //   icon: Image.asset(
+                //     _searchIcon,
+                //     width: 30,
+                //     height: 30,
+                //     color: SharedColors.primary,
+                //   ),
+                // ),
 
                 /// 🔔 NOTIFICATION
                 IconButton(
@@ -348,8 +349,22 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                   ),
                 ),
 
+                IconButton(
+                  iconSize: 30,
+                  onPressed: () {
+                    _showSupportDialog(context);
+                  },
+                  icon: Image.asset(
+                    'assets/support.png',
+                    width: 30,
+                    height: 30,
+                    fit: BoxFit.contain,
+                  ),
+                ),
                 const SizedBox(width: 8),
               ],
+
+
             ),
 
 
@@ -360,57 +375,57 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                 children: _refreshableScreens,
               ),
             ),
-            bottomNavigationBar: BottomNavigationBar(
-              backgroundColor: SharedColors.buttonTextColor,
-              elevation: 8,
+            bottomNavigationBar:BottomNavigationBar(
+              currentIndex: _selectedIndex,
+              onTap: (index) {
+                setState(() {
+                  _selectedIndex = index;
+                });
+              },
+              selectedItemColor: SharedColors.primary,
+              unselectedItemColor: Colors.grey.shade400,
+              selectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w600,
+              ),
+              type: BottomNavigationBarType.fixed,
+              elevation: 10,
               items: [
                 _buildBottomNavItem(0, "Home"),
-                _buildBottomNavItem(1, "Downloads"),
+                _buildBottomNavItem(1, "Folder"),
                 _buildBottomNavItem(2, "Profile"),
               ],
-              currentIndex: _selectedIndex,
-              selectedItemColor: SharedColors.primary,
-              unselectedItemColor: Colors.black,
-              showSelectedLabels: false,
-              showUnselectedLabels: false,
-              onTap: (value) {
-                if (_selectedIndex == value) {
-                  _refreshIndicatorKeys[value].currentState?.show();
-                }
-                setState(() => _selectedIndex = value);
-              },
-            ),
+            )
           ),
-          Positioned(
-            right: 16,
-            bottom: 80,
-            child: SlideTransition(
-              position: _offsetAnimation,
-              child: FadeTransition(
-                opacity: _opacityAnimation,
-                child: GestureDetector(
-                  onTap: () async {
-                    final Uri whatsapp = Uri.parse("https://wa.me/918125262928");
-                    try {
-                      if (!await launchUrl(
-                        whatsapp,
-                        mode: LaunchMode.externalApplication,
-                      )) {
-                        debugPrint("❌ Could not open WhatsApp");
-                      }
-                    } catch (e) {
-                      debugPrint("⚠️ Error launching WhatsApp: $e");
-                    }
-                  },
-                  child: Image.asset(
-                    'assets/images/whatsapp.png',
-                    width: 45,
-                    height: 45,
-                  ),
-                ),
-              ),
-            ),
-          ),
+          // Positioned(
+          //   right: 16,
+          //   bottom: 80,
+          //   child: SlideTransition(
+          //     position: _offsetAnimation,
+          //     child: FadeTransition(
+          //       opacity: _opacityAnimation,
+          //       child: GestureDetector(
+          //         onTap: () async {
+          //           final Uri whatsapp = Uri.parse("https://wa.me/918125262928");
+          //           try {
+          //             if (!await launchUrl(
+          //               whatsapp,
+          //               mode: LaunchMode.externalApplication,
+          //             )) {
+          //               debugPrint("❌ Could not open WhatsApp");
+          //             }
+          //           } catch (e) {
+          //             debugPrint("⚠️ Error launching WhatsApp: $e");
+          //           }
+          //         },
+          //         child: Image.asset(
+          //           'assets/images/whatsapp.png',
+          //           width: 45,
+          //           height: 45,
+          //         ),
+          //       ),
+          //     ),
+          //   ),
+          // ),
         ],
       ),
     );
@@ -418,15 +433,209 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
 
   BottomNavigationBarItem _buildBottomNavItem(int index, String label) {
     final isSelected = _selectedIndex == index;
-    final iconPath = isSelected ? _navIcons[index]['selected']! : _navIcons[index]['unselected']!;
+
     return BottomNavigationBarItem(
-      icon: Image.asset(
-        iconPath,
-        width: 24,
-        height: 24,
-        color: isSelected ? SharedColors.primary : Colors.grey,
-      ),
       label: label,
+      icon: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? SharedColors.primary.withOpacity(0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: FaIcon(
+          _navIcons[index],   // ✅ Just use index
+          size: 22,
+          color: isSelected
+              ? SharedColors.primary
+              : Colors.grey.shade400,
+        ),
+      ),
     );
+  }
+}
+
+
+
+void _showSupportDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    barrierColor: Colors.black.withOpacity(0.4),
+    builder: (context) {
+      return Dialog(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(25),
+            gradient: const LinearGradient(
+              colors: [
+                Color(0xFFE8FDF5),
+                Color(0xFFFFFFFF),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 20,
+                spreadRadius: 2,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+
+              /// Decorative Background Circles
+              Positioned(
+                top: -40,
+                right: -40,
+                child: Container(
+                  height: 120,
+                  width: 120,
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.08),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+
+              Positioned(
+                bottom: -30,
+                left: -30,
+                child: Container(
+                  height: 100,
+                  width: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.06),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+
+                    /// Close Button
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            borderRadius: BorderRadius.circular(50),
+                          ),
+                          padding: const EdgeInsets.all(6),
+                          child: const Icon(Icons.close,
+                              color: Colors.white, size: 18),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    /// Top Image
+                    Image.asset(
+                      'assets/support.png',
+                      height: 150,
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    /// WhatsApp
+                    _supportTile(
+                      icon: FontAwesomeIcons.whatsapp,
+                      text: "Sales",
+                      onTap: () {
+                        _openWhatsApp(
+                          "918125262928",
+                          "Hello, I want to know about sales.",
+                        );
+                      },
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    /// Call
+                    _supportTile(
+                      icon: FontAwesomeIcons.whatsapp,
+                      text: "Support",
+                      onTap: () {
+                        _openWhatsApp(
+                          "918125262928",
+                          "Hello, I want to know about sales.",
+                        );
+                      },
+                    ),
+
+                    const SizedBox(height: 14),
+
+
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+
+Widget _supportTile({
+  required IconData icon,
+  required String text,
+  required VoidCallback onTap,
+}) {
+  return InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(12),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: Colors.transparent,
+            child: Icon(icon, color: Colors.green),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const Icon(Icons.arrow_forward_ios,
+              size: 16, color: Colors.red),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _openWhatsApp(String phone, String message) async {
+  final Uri url = Uri.parse(
+      "https://wa.me/$phone?text=${Uri.encodeComponent(message)}");
+
+  if (await canLaunchUrl(url)) {
+    await launchUrl(url, mode: LaunchMode.externalApplication);
+  } else {
+    debugPrint("Could not launch WhatsApp");
   }
 }

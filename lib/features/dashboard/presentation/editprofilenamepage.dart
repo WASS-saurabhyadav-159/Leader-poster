@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:logger/logger.dart';
 import '../../../config/colors.dart';
 import '../../../core/network/api_service.dart';
@@ -133,12 +134,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
       child: Column(
         children: [
           _buildProfileField("Name", Icons.person, nameController, isEditable: true),
+          _buildProfileField("Designation", Icons.work, designationController, isEditable: true),
           _buildProfileField("Phone", Icons.phone, phoneController, isEditable: false),
           _buildProfileField("Email", Icons.email, emailController, isEditable: true),
           _buildStateField(),
           _buildConstituencyField(),
-          _buildProfileField("Referral Code", Icons.card_giftcard, referralCodeController, isEditable: false),
-          _buildProfileField("Designation", Icons.work, designationController, isEditable: true),
+          _buildReferralCodeField(),
           _buildProfileField("Profile ID", Icons.badge, profileIdController, isEditable: false),
           _buildProfileField("User ID", Icons.perm_identity, userIdController, isEditable: false),
           if (isEditing) _buildUpdateButton(),
@@ -267,6 +268,64 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     fillColor: Colors.grey[100],
                   ),
                 ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReferralCodeField() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("Referral Code", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Stack(
+            children: [
+              TextField(
+                controller: referralCodeController,
+                enabled: false,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.card_giftcard, color: Colors.grey),
+                  border: _buildBorder(SharedColors.primaryDark),
+                  enabledBorder: _buildBorder(SharedColors.primaryDark),
+                  focusedBorder: _buildBorder(SharedColors.primaryDark),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                ),
+              ),
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () async {
+                      final code = referralCodeController.text.trim();
+                      if (code.isNotEmpty) {
+                        await Clipboard.setData(ClipboardData(text: code));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Referral code copied!"),
+                            duration: Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.copy, color: SharedColors.primaryDark, size: 20),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

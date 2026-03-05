@@ -11,6 +11,7 @@ import '../models/ProtocolImage.dart';
 import '../models/SelfImage.dart';
 import '../models/TodaySpecial.dart';
 import '../models/video.dart';
+import '../utils/error_handler.dart';
 import 'api_constants.dart';
 import 'local_storage.dart';
 
@@ -22,58 +23,16 @@ class ApiService {
   ));
   final Logger logger = Logger();
 
-  // Check internet connection
-  Future<bool> _hasInternetConnection() async {
-    try {
-      final connectivityResult = await Connectivity().checkConnectivity();
-      if (connectivityResult == ConnectivityResult.none) {
-        return false;
-      }
-      return true;
-    } catch (e) {
-      logger.e("Internet check failed: $e");
-      return false;
-    }
-  }
-
   // Handle different types of errors
   void _handleError(dynamic e) {
     if (e is DioException) {
-      switch (e.type) {
-        case DioExceptionType.connectionTimeout:
-        case DioExceptionType.receiveTimeout:
-        case DioExceptionType.sendTimeout:
-          throw Exception("Connection timeout. Please try again.");
-        case DioExceptionType.badResponse:
-          if (e.response?.statusCode == 404) {
-            throw Exception("API endpoint not found (404)");
-          } else if (e.response?.statusCode == 401) {
-            throw Exception("Unauthorized access. Please login again.");
-          } else if (e.response?.statusCode == 500) {
-            throw Exception("Server error. Please try again later.");
-          } else {
-            throw Exception("Request failed with status ${e.response?.statusCode}");
-          }
-        case DioExceptionType.cancel:
-          throw Exception("Request cancelled");
-        case DioExceptionType.unknown:
-          if (e.error is SocketException) {
-            throw Exception("No internet connection");
-          }
-          throw Exception("Unknown error occurred");
-        default:
-          throw Exception("Network error occurred");
-      }
+      throw e; // Let ErrorHandler handle it
     }
     throw Exception("An unexpected error occurred");
   }
 
   /// Sends a POST request to the specified endpoint with the provided data
   Future<Map<String, dynamic>> post(String endpoint, Map<String, dynamic> data) async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
-
     try {
       logger.d("POST $endpoint with data: $data");
       Response response = await _dio.post(endpoint, data: data);
@@ -91,14 +50,8 @@ class ApiService {
     int limit = 10,
     int offset = 0,
   }) async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
-
     try {
-      // Get the masterAppId from local storage
       final String masterAppId = await getAppMasterId();
-
       logger.d("Fetching banners with limit: $limit, offset: $offset, masterAppId: $masterAppId");
 
       final response = await _dio.get(
@@ -106,13 +59,12 @@ class ApiService {
         queryParameters: {
           "limit": limit,
           "offset": offset,
-          "masterAppId": masterAppId, // Add masterAppId to query parameters
+          "masterAppId": masterAppId,
         },
       );
 
       final List<dynamic> banners = response.data["result"] as List;
 
-      // Preload all banner images before returning
       for (var banner in banners) {
         final imageUrl = banner['image'];
         if (imageUrl != null && imageUrl is String && imageUrl.isNotEmpty) {
@@ -121,27 +73,15 @@ class ApiService {
       }
 
       return banners;
-    } on DioException catch (e) {
-      logger.e("Error fetching banners: $e");
-      if (e.response?.statusCode == 404) {
-        throw Exception("Banners endpoint not found");
-      } else if (e.response?.statusCode == 500) {
-        throw Exception("Server error while fetching banners");
-      } else {
-        throw Exception("Failed to fetch banners. Please try again.");
-      }
     } catch (e) {
-      logger.e("General error fetching banners: $e");
-      throw Exception("Failed to fetch banners. Please try again.");
+      logger.e("Error fetching banners: $e");
+      _handleError(e);
+      rethrow;
     }
   }
 
   /// Fetches a list of categories for the user
   Future<List<Category>> fetchCategories() async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
-
     try {
       String? token = await getToken();
       if (token == null) throw Exception("Authentication required");
@@ -152,8 +92,8 @@ class ApiService {
 
       _dio.options.headers["Authorization"] = "Bearer $token";
 
+      // Don't pass categoryId for home page - it filters the results
       final queryParams = {
-        if (categoryId != null) "categoryId": categoryId,
         if (searchCategoryClickId != null) "searchCategoryClickId": searchCategoryClickId,
       };
 
@@ -161,53 +101,90 @@ class ApiService {
         "category/user/list/$appMasterId",
         queryParameters: queryParams,
       );
-      print("📦 RAW API RESPONSE:");
-      print(response.data);
-      print("══════════════════════════════════════════════════════════════");
+
+      logger.d("Categories API URL: category/user/list/$appMasterId");
+      logger.d("Categories Query Params: $queryParams");
+      logger.d("Categories API Response: ${response.data}");
+
       List<Category> categories = [];
 
       for (var item in response.data["result"]) {
         String id = item["id"];
         String name = item["name"];
 
-        List<Poster> posters = (item["poster"] as List).map((posterData) {
-          // Parse specialDay if it exists
-          SpecialDay? specialDay;
-          if (posterData["specialDay"] != null) {
-            specialDay = SpecialDay(
-              name: posterData["specialDay"]["name"] ?? "",
-              month: posterData["specialDay"]["month"] ?? "",
-              day: posterData["specialDay"]["day"] ?? "",
+        // Parse posterGroups if available
+        List<PosterGroup> posterGroups = [];
+        if (item["posterGroups"] != null && item["posterGroups"] is List) {
+          var posterGroupsList = item["posterGroups"] as List;
+          logger.d("Category $name has ${posterGroupsList.length} posterGroups");
+
+          posterGroups = posterGroupsList.map((groupData) {
+            logger.d("Processing posterGroup: $groupData");
+            List<Poster> posters = (groupData["posters"] as List? ?? []).map((posterData) {
+              return _parsePoster(posterData);
+            }).toList();
+
+            return PosterGroup(
+              albumId: groupData["albumId"]?.toString() ?? "",
+              albumName: groupData["albumName"]?.toString() ?? "",
+              albumDate: groupData["albumDate"]?.toString() ?? "",
+              posters: posters,
             );
-          }
+          }).toList();
+        }
 
-          bool isVideo = (posterData["poster"]?.toString().toLowerCase().endsWith('.mp4') ?? false) ||
-              (posterData["poster"]?.toString().toLowerCase().endsWith('.mov') ?? false);
+        // Parse direct posters if available (legacy support)
+        List<Poster> posters = [];
+        if (item["poster"] != null && item["poster"] is List) {
+          posters = (item["poster"] as List).map((posterData) {
+            return _parsePoster(posterData);
+          }).toList();
+        }
 
-          // Handle null values properly with null coalescing
-          return Poster(
-            id: posterData["id"]?.toString() ?? "",
-            posterUrl: posterData["poster"]?.toString() ?? "",
-            specialDay: specialDay,
-            isVideo: isVideo,
-            videoThumb: posterData["videoThumb"]?.toString(),
-            date: posterData["date"]?.toString(),
-            position: posterData["position"]?.toString(),
-            topDefNum: _parseIntSafely(posterData["topDefNum"]),
-            selfDefNum: _parseIntSafely(posterData["selfDefNum"]),
-            bottomDefNum: _parseIntSafely(posterData["bottomDefNum"]),
-          );
-        }).toList();
+        categories.add(Category(
+          id: id,
+          name: name,
+          posters: posters,
+          posterGroups: posterGroups,
+        ));
 
-        categories.add(Category(id: id, name: name, posters: posters));
+        logger.d("Category: $name - Posters: ${posters.length}, PosterGroups: ${posterGroups.length}");
       }
 
       return categories;
     } catch (e) {
       logger.e("Failed to fetch categories: $e");
       _handleError(e);
-      return [];
+      rethrow;
     }
+  }
+
+  // Helper method to parse poster data
+  Poster _parsePoster(Map<String, dynamic> posterData) {
+    SpecialDay? specialDay;
+    if (posterData["specialDay"] != null) {
+      specialDay = SpecialDay(
+        name: posterData["specialDay"]["name"] ?? "",
+        month: posterData["specialDay"]["month"] ?? "",
+        day: posterData["specialDay"]["day"] ?? "",
+      );
+    }
+
+    bool isVideo = (posterData["poster"]?.toString().toLowerCase().endsWith('.mp4') ?? false) ||
+        (posterData["poster"]?.toString().toLowerCase().endsWith('.mov') ?? false);
+
+    return Poster(
+      id: posterData["id"]?.toString() ?? "",
+      posterUrl: posterData["poster"]?.toString() ?? "",
+      specialDay: specialDay,
+      isVideo: isVideo,
+      videoThumb: posterData["videoThumb"]?.toString(),
+      date: posterData["date"]?.toString(),
+      position: posterData["position"]?.toString(),
+      topDefNum: _parseIntSafely(posterData["topDefNum"]),
+      selfDefNum: _parseIntSafely(posterData["selfDefNum"]),
+      bottomDefNum: _parseIntSafely(posterData["bottomDefNum"]),
+    );
   }
 
 // Helper method to safely parse integers from dynamic values
@@ -223,24 +200,14 @@ class ApiService {
     int limit = 10,
     int offset = 0,
   }) async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
-
     try {
-      // 🔑 Token
       String? token = await getToken();
       if (token == null) throw Exception("Authentication required");
 
-      // 🔑 App Master ID from local storage (or default fallback)
       String appMasterId = await getAppMasterId();
-
-      // 🔑 Headers
       _dio.options.headers["Authorization"] = "Bearer $token";
-
       logger.d("Fetching notifications for masterAppId: $appMasterId");
 
-      // 🔑 API call → appMasterId in PATH, limit & offset in QUERY
       final response = await _dio.get(
         "notifications/user/$appMasterId",
         queryParameters: {
@@ -250,30 +217,23 @@ class ApiService {
       );
 
       logger.d("Notifications API Response: ${response.data}");
-
       return List<Map<String, dynamic>>.from(response.data["result"]);
     } catch (e) {
       logger.e("Failed to fetch notifications: $e");
       _handleError(e);
-      return [];
+      rethrow;
     }
   }
 
 
   /// Fetches the user's profile information
   Future<Map<String, dynamic>> getProfile() async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
-
     try {
       String? token = await getToken();
       if (token == null) throw Exception("Authentication required");
 
       _dio.options.headers["Authorization"] = "Bearer $token";
-      logger.d("Fetching user profile");
-
-      final response = await _dio.get("account/user/profile");
+      final response = await _dio.get(ApiConstants.userProfileEndpoint);
       return response.data;
     } catch (e) {
       logger.e("Failed to fetch profile: $e");
@@ -282,12 +242,33 @@ class ApiService {
     }
   }
 
+  /// Increases poster count
+  Future<Map<String, dynamic>> increaseCount({
+    required String categoryId,
+    required String posterId,
+  }) async {
+    try {
+      String? token = await getToken();
+      if (token == null) throw Exception("Authentication required");
+
+      _dio.options.headers["Authorization"] = "Bearer $token";
+      final response = await _dio.post(
+        ApiConstants.increaseCountEndpoint,
+        queryParameters: {
+          'categoryId': categoryId,
+          'posterId': posterId,
+        },
+      );
+      return response.data;
+    } catch (e) {
+      logger.e("Failed to increase count: $e");
+      _handleError(e);
+      rethrow;
+    }
+  }
+
   /// Fetches special days (events) from the API
   Future<List<Map<String, dynamic>>> fetchEvents() async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
-
     try {
       String? token = await getToken();
       if (token == null) throw Exception("Authentication required");
@@ -302,7 +283,7 @@ class ApiService {
     } catch (e) {
       logger.e("Failed to fetch events: $e");
       _handleError(e);
-      return [];
+      rethrow;
     }
   }
 
@@ -312,31 +293,21 @@ class ApiService {
     int limit = 10,
     int offset = 0,
   }) async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
-
     try {
-      // 🔑 Load token
       String? token = await getToken();
       if (token == null) throw Exception("Authentication required");
 
-      // 🔑 Load mandatory App Master ID
       String appMasterId = await getAppMasterId();
-
-      // Set headers
       _dio.options.headers["Authorization"] = "Bearer $token";
 
-      // Build query params (❌ no categoryId here)
       final queryParams = {
         "limit": limit,
         "offset": offset,
-        "masterAppId": appMasterId, // ✅ correct key
+        "masterAppId": appMasterId,
       };
 
       logger.d("Fetching posters for categoryId: $categoryId with params: $queryParams");
 
-      // API call (categoryId in path, not query)
       final response = await _dio.get(
         "poster/all/$categoryId",
         queryParameters: queryParams,
@@ -348,7 +319,7 @@ class ApiService {
     } catch (e) {
       logger.e("Failed to fetch posters: $e");
       _handleError(e);
-      return [];
+      rethrow;
     }
   }
 
@@ -389,7 +360,11 @@ class ApiService {
     required String name,
     required String phoneNumber,
     required String masterAppId,
-    String? email,
+    required String email,
+    required String state,
+    required String constituency,
+    String? referredBy,
+    String? designation,
   }) async {
     try {
       final response = await _dio.post(
@@ -398,7 +373,12 @@ class ApiService {
           'name': name,
           'phoneNumber': phoneNumber,
           'masterAppId': masterAppId,
-          if (email != null && email.isNotEmpty) 'email': email,
+          'email': email,
+          'state': state,
+          'constituency': constituency,
+          if (referredBy != null && referredBy.isNotEmpty) 'referredBy': referredBy,
+          if (designation != null && designation.isNotEmpty) 'designation': designation,
+          'registrationTime': DateTime.now().toIso8601String(),
         },
         options: Options(
           headers: {
@@ -415,9 +395,6 @@ class ApiService {
 
   /// Uploads profile image
   Future<bool> uploadProfileImage(File imageFile) async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
 
     try {
       String? token = await getToken();
@@ -454,16 +431,13 @@ class ApiService {
     }
   }
 
-  /// Searches posters based on keyword
+  /// Searches posters based on keyword - returns grouped by albums
   Future<List<Map<String, dynamic>>> searchPosters({
     String keyword = "",
-    int limit = 10,
+    int limit = 20,
     int offset = 0,
     String? categoryId,
   }) async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
 
     try {
       String? token = await getToken();
@@ -472,16 +446,21 @@ class ApiService {
       _dio.options.headers["Authorization"] = "Bearer $token";
       logger.d("Searching posters for keyword: $keyword");
 
+      final queryParams = {
+        "limit": limit,
+        "offset": offset,
+        "keyword": keyword,
+        if (categoryId != null) "categoryId": categoryId,
+      };
+
       final response = await _dio.get(
-        "poster/search",
-        queryParameters: {
-          "limit": limit,
-          "offset": offset,
-          "keyword": keyword,
-          if (categoryId != null) "categoryId": categoryId,
-        },
+        ApiConstants.searchPostersEndpoint,
+        queryParameters: queryParams,
       );
 
+      logger.d("Search API Response: ${response.data}");
+
+      // Return the grouped result (albums with posters)
       return List<Map<String, dynamic>>.from(response.data["result"]);
     } catch (e) {
       logger.e("Failed to search posters: $e");
@@ -492,9 +471,6 @@ class ApiService {
 
   /// Fetches categories for search
   Future<List<Category>> fetchCategoriesSearch() async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
 
     try {
       String? token = await getToken();
@@ -509,7 +485,7 @@ class ApiService {
         id: item["id"],
         name: item["name"],
         posters: [],
-        // events: {},
+        posterGroups: [],
       ))
           .toList();
 
@@ -523,9 +499,6 @@ class ApiService {
 
   /// Sends OTP for password reset
   // Future<Map<String, dynamic>> sendOtp(String email) async {
-  //   if (!await _hasInternetConnection()) {
-  //     throw Exception("No internet connection");
-  //   }
   //
   //   try {
   //     logger.d("Sending OTP to: $email");
@@ -543,9 +516,6 @@ class ApiService {
 
   /// Verifies OTP
   // Future<bool> verifyOtp(String email, String otp) async {
-  //   if (!await _hasInternetConnection()) {
-  //     throw Exception("No internet connection");
-  //   }
   //
   //   try {
   //     logger.d("Verifying OTP for: $email");
@@ -566,9 +536,6 @@ class ApiService {
       String email,
       String newPassword,
       ) async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
 
     try {
       logger.d("Resetting password for: $email");
@@ -592,9 +559,6 @@ class ApiService {
   // In ApiService class to veryfy mobile number when login
 
   Future<Map<String, dynamic>> sendOtp(String mobile, String masterAppId) async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
 
     try {
       logger.d("Sending OTP to mobile: $mobile with masterAppId: $masterAppId");
@@ -627,9 +591,6 @@ class ApiService {
 
 ///////for login new api
   Future<Map<String, dynamic>> verifyOtp(String mobile, String otp, String masterAppId) async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
 
     try {
       logger.d("Verifying OTP for mobile: $mobile with masterAppId: $masterAppId");
@@ -674,9 +635,6 @@ class ApiService {
   }
 
   Future<PageContent> getPageContent(int pageId) async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
 
     try {
       // Get token from local storage
@@ -709,10 +667,6 @@ class ApiService {
       String endpoint,
       Map<String, dynamic> data,
       ) async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
-
     try {
       String? token = await getToken();
       if (token == null) throw Exception("Authentication required");
@@ -720,10 +674,7 @@ class ApiService {
       _dio.options.headers["Authorization"] = "Bearer $token";
       logger.d("PATCH $endpoint with data: $data");
 
-      Response response = await _dio.patch(
-        endpoint,
-        data: data,
-      );
+      Response response = await _dio.patch(endpoint, data: data);
       return response.data;
     } catch (e) {
       logger.e("PATCH $endpoint failed: $e");
@@ -756,9 +707,6 @@ class ApiService {
 
   ////////fetch list
   Future<List<SelfImage>> fetchSelfImages() async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
 
     try {
       String? token = await getToken();
@@ -782,9 +730,6 @@ class ApiService {
 
   /////protocall
   Future<List<ProtocolImage>> fetchProtocolImages() async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
     try {
       String? token = await getToken();
       if (token == null) throw Exception("Authentication required");
@@ -801,9 +746,6 @@ class ApiService {
   }
 /////////footer
   Future<List<FooterImage>> fetchFooterImages() async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
     String? token = await getToken();
     if (token == null) throw Exception("Authentication required");
 
@@ -822,9 +764,6 @@ class ApiService {
 
   // In your ApiService class, add this method:
   Future<List<TodaySpecial>> fetchTodaySpecial() async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
 
     try {
       String? token = await getToken();
@@ -855,9 +794,6 @@ class ApiService {
 
   // In ApiService class, add this method:
   Future<List<RecentFinishedPoster>> fetchRecentFinishedPosters() async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
 
     try {
       String? token = await getToken();
@@ -890,9 +826,6 @@ class ApiService {
     int limit = 10,
     int offset = 0,
   }) async {
-    if (!await _hasInternetConnection()) {
-      throw Exception("No internet connection");
-    }
 
     try {
       String? token = await getToken();
@@ -947,6 +880,381 @@ class ApiService {
       logger.e("Failed to fetch videos: $e\n$st");
       _handleError(e);
       return [];
+    }
+  }
+
+  /// Fetches states list
+  Future<List<Map<String, dynamic>>> fetchStates({
+    int limit = 10,
+    int offset = 0,
+    String keyword = "",
+  }) async {
+
+    try {
+      logger.d("Fetching states with limit: $limit, offset: $offset, keyword: $keyword");
+
+      final response = await _dio.get(
+        "state/all",
+        queryParameters: {
+          "limit": limit,
+          "offset": offset,
+          "keyword": keyword,
+        },
+      );
+
+      return List<Map<String, dynamic>>.from(response.data["result"]);
+    } catch (e) {
+      logger.e("Failed to fetch states: $e");
+      _handleError(e);
+      return [];
+    }
+  }
+
+  /// Fetches constituencies list by state ID
+  Future<List<Map<String, dynamic>>> fetchConstituencies({
+    required int stateId,
+    int limit = 10,
+    int offset = 0,
+    String keyword = "",
+  }) async {
+
+    try {
+      logger.d("Fetching constituencies for stateId: $stateId with limit: $limit, offset: $offset, keyword: $keyword");
+
+      final response = await _dio.get(
+        "constituency/list",
+        queryParameters: {
+          "limit": limit,
+          "offset": offset,
+          "keyword": keyword,
+          "stateId": stateId,
+        },
+      );
+
+      return List<Map<String, dynamic>>.from(response.data["result"]);
+    } catch (e) {
+      logger.e("Failed to fetch constituencies: $e");
+      _handleError(e);
+      return [];
+    }
+  }
+
+  /// Fetches subscription plans
+  Future<List<Map<String, dynamic>>> fetchSubscriptionPlans({
+    int limit = 10,
+    int offset = 0,
+    String keyword = "",
+  }) async {
+
+    try {
+      String? token = await getToken();
+      if (token == null) throw Exception("Authentication required");
+
+      _dio.options.headers["Authorization"] = "Bearer $token";
+      logger.d("Fetching subscription plans with limit: $limit, offset: $offset, keyword: $keyword");
+
+      final response = await _dio.get(
+        "plan/all",
+        queryParameters: {
+          "limit": limit,
+          "offset": offset,
+          "keyword": keyword,
+        },
+      );
+
+      logger.d("Subscription Plans API Response: ${response.data}");
+      return List<Map<String, dynamic>>.from(response.data["result"]);
+    } catch (e) {
+      logger.e("Failed to fetch subscription plans: $e");
+      _handleError(e);
+      return [];
+    }
+  }
+
+  /// Submits a suggestion with optional image
+  Future<Map<String, dynamic>> submitSuggestion({
+    required String title,
+    required String desc,
+    File? file,
+  }) async {
+    try {
+      String? token = await getToken();
+      if (token == null) throw Exception("Authentication required");
+
+      _dio.options.headers["Authorization"] = "Bearer $token";
+      logger.d("Submitting suggestion: $title");
+
+      FormData formData = FormData.fromMap({
+        "title": title,
+        "desc": desc,
+        if (file != null)
+          "file": await MultipartFile.fromFile(
+            file.path,
+            filename: file.path.split('/').last,
+          ),
+      });
+
+      final response = await _dio.post(
+        "suggestion",
+        data: formData,
+        options: Options(
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        ),
+      );
+
+      logger.i("Suggestion submitted successfully: ${response.data}");
+      return response.data;
+    } catch (e) {
+      logger.e("Failed to submit suggestion: $e");
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  /// Creates payment order
+  Future<Map<String, dynamic>> createPaymentOrder({
+    required int amount,
+  }) async {
+    try {
+      String? token = await getToken();
+      if (token == null) throw Exception("Authentication required");
+
+      _dio.options.headers["Authorization"] = "Bearer $token";
+      logger.d("Creating payment order for amount: $amount");
+
+      final response = await _dio.post(
+        "payment-history/create-order",
+        data: {"amount": amount},
+      );
+
+      logger.i("Payment order created: ${response.data}");
+      return response.data;
+    } catch (e) {
+      logger.e("Failed to create payment order: $e");
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  /// Saves payment after successful transaction
+  Future<Map<String, dynamic>> savePayment({
+    required String planId,
+    required int amount,
+    required String status,
+    required String orderId,
+    required String paymentId,
+    required String signature,
+    String? converterId,
+  }) async {
+    try {
+      String? token = await getToken();
+      if (token == null) throw Exception("Authentication required");
+
+      _dio.options.headers["Authorization"] = "Bearer $token";
+      logger.d("Saving payment for orderId: $orderId with converterId: $converterId");
+
+      final data = {
+        "planId": planId,
+        "amount": amount,
+        "status": status,
+        "orderId": orderId,
+        "paymentId": paymentId,
+        "signature": signature,
+      };
+
+      if (converterId != null && converterId.isNotEmpty) {
+        data["converterId"] = converterId;
+      }
+
+      final response = await _dio.post(
+        "payment-history/save-payment",
+        data: data,
+      );
+
+      logger.i("Payment saved successfully: ${response.data}");
+      return response.data;
+    } catch (e) {
+      logger.e("Failed to save payment: $e");
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  /// Fetches payment history
+  Future<Map<String, dynamic>> fetchPaymentHistory({
+    int limit = 10,
+    int offset = 0,
+  }) async {
+    try {
+      String? token = await getToken();
+      if (token == null) throw Exception("Authentication required");
+
+      _dio.options.headers["Authorization"] = "Bearer $token";
+      logger.d("Fetching payment history with limit: $limit, offset: $offset");
+
+      final response = await _dio.get(
+        "payment-history/list",
+        queryParameters: {
+          "limit": limit,
+          "offset": offset,
+        },
+      );
+
+      logger.i("Payment history fetched: ${response.data}");
+      return response.data;
+    } catch (e) {
+      logger.e("Failed to fetch payment history: $e");
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  /// Fetches languages list
+  Future<List<Map<String, dynamic>>> fetchLanguages({
+    int limit = 10,
+    int offset = 0,
+  }) async {
+    try {
+      String? token = await getToken();
+      if (token == null) throw Exception("Authentication required");
+
+      _dio.options.headers["Authorization"] = "Bearer $token";
+      logger.d("Fetching languages with limit: $limit, offset: $offset");
+
+      final response = await _dio.get(
+        "languages/all",
+        queryParameters: {
+          "limit": limit,
+          "offset": offset,
+        },
+      );
+
+      logger.i("Languages fetched: ${response.data}");
+      return List<Map<String, dynamic>>.from(response.data["result"]);
+    } catch (e) {
+      logger.e("Failed to fetch languages: $e");
+      _handleError(e);
+      return [];
+    }
+  }
+
+  /// Fetches posters by album ID with optional language filter
+  Future<List<Map<String, dynamic>>> fetchPostersByAlbum({
+    required String albumId,
+    String? languageId,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    try {
+      String? token = await getToken();
+      if (token == null) throw Exception("Authentication required");
+
+      String appMasterId = await getAppMasterId();
+      _dio.options.headers["Authorization"] = "Bearer $token";
+
+      final queryParams = {
+        "limit": limit,
+        "offset": offset,
+        "masterAppId": appMasterId,
+        if (languageId != null) "languageId": languageId,
+      };
+
+      logger.d("Fetching posters for albumId: $albumId with params: $queryParams");
+
+      final response = await _dio.get(
+        "poster/album/$albumId",
+        queryParameters: queryParams,
+      );
+
+      logger.i("Album posters fetched: ${response.data}");
+      return List<Map<String, dynamic>>.from(response.data["result"]);
+    } catch (e) {
+      logger.e("Failed to fetch album posters: $e");
+      _handleError(e);
+      return [];
+    }
+  }
+
+  /// Fetches all albums
+  Future<List<Map<String, dynamic>>> fetchAllAlbums({
+    int limit = 10,
+    int offset = 0,
+  }) async {
+    try {
+      String? token = await getToken();
+      if (token == null) throw Exception("Authentication required");
+
+      _dio.options.headers["Authorization"] = "Bearer $token";
+      logger.d("Fetching all albums with limit: $limit, offset: $offset");
+
+      final response = await _dio.get(
+        "album/all",
+        queryParameters: {
+          "limit": limit,
+          "offset": offset,
+        },
+      );
+
+      logger.i("Albums fetched: ${response.data}");
+      return List<Map<String, dynamic>>.from(response.data["result"]);
+    } catch (e) {
+      logger.e("Failed to fetch albums: $e");
+      _handleError(e);
+      return [];
+    }
+  }
+
+  /// Uploads self image with position
+  Future<Map<String, dynamic>?> uploadSelfImage(File imageFile, String position) async {
+    try {
+      String? token = await getToken();
+      if (token == null) throw Exception("Authentication required");
+
+      String fileName = imageFile.path.split('/').last;
+      String positionUpper = position.toUpperCase();
+
+      FormData formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(imageFile.path, filename: fileName),
+        'position': positionUpper,
+      });
+
+      logger.d("Uploading self image with position: $positionUpper");
+
+      final response = await _dio.post(
+        'self-image/user',
+        data: formData,
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      logger.i("Self image uploaded successfully: ${response.data}");
+      return response.data;
+    } catch (e) {
+      logger.e("Failed to upload self image: $e");
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  /// Deletes self image by ID
+  Future<void> deleteSelfImage(String imageId) async {
+    try {
+      String? token = await getToken();
+      if (token == null) throw Exception("Authentication required");
+
+      logger.d("Deleting self image with ID: $imageId");
+
+      await _dio.delete(
+        'self-image/remove/user/$imageId',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      logger.i("Self image deleted successfully");
+    } catch (e) {
+      logger.e("Failed to delete self image: $e");
+      _handleError(e);
+      rethrow;
     }
   }
 }

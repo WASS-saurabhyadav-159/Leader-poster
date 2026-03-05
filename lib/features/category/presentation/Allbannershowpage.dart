@@ -16,6 +16,12 @@ class AllPosterPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Collect all posters from both direct posters and posterGroups
+    List<Poster> allPosters = [...category.posters];
+    for (var group in category.posterGroups) {
+      allPosters.addAll(group.posters);
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -37,9 +43,9 @@ class AllPosterPage extends StatelessWidget {
           mainAxisSpacing: 6.0,
           childAspectRatio: 0.85,
         ),
-        itemCount: category.posters.length,
+        itemCount: allPosters.length,
         itemBuilder: (context, index) {
-          final poster = category.posters[index];
+          final poster = allPosters[index];
 
           return GestureDetector(
             onTap: () {

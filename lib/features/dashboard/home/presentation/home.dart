@@ -15,6 +15,7 @@ import '../../../category/presentation/TodaySpecialSection.dart';
 import '../../../category/presentation/RecentFinishedSection.dart';
 import '../../../category/presentation/edit_banner_screen.dart';
 import '../../presentation/VideoPlayerPopup.dart';
+import '../../presentation/SecretScreen.dart';
 import 'category_highlight.dart';
 import 'home_slider.dart';
 import '../../../../config/colors.dart';
@@ -165,7 +166,36 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             SliverToBoxAdapter(
               child: Column(
                 children: [
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 15),
+                  // Search Bar
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) =>  SecretScreen()),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.search, color: Colors.grey.shade600),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Search Upcoming Events ....',
+                              style: TextStyle(color: Colors.grey.shade600, fontSize: 15),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   HomeSlider(banners: bannerList),
                   const SizedBox(height: 16),
 

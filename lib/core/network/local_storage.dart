@@ -4,7 +4,7 @@ import 'package:logger/logger.dart';
 final Logger logger = Logger(); // Initialize the logger
 
 // Default App Master ID constant
-const String defaultAppMasterId = '9f2c5b0a-0fab-4abc-bf56-c482f0beb60b';
+const String defaultAppMasterId ="d6960179-c3bd-411d-82fd-da733b826967";
 
 /// Saves the authentication token to SharedPreferences.
 Future<void> saveToken(String token) async {
@@ -80,20 +80,10 @@ Future<void> saveAppMasterId([String? customAppMasterId]) async {
 }
 
 /// Retrieves the app master ID from SharedPreferences.
-/// Returns the default app master ID if none is stored.
+/// Always returns the default app master ID.
 Future<String> getAppMasterId() async {
-  final prefs = await SharedPreferences.getInstance();
-  String? appMasterId = prefs.getString('app_master_id');
-
-  // If no app master ID is stored, use the default one
-  if (appMasterId == null) {
-    appMasterId = defaultAppMasterId;
-    // Optionally save the default ID for future use
-    await saveAppMasterId(defaultAppMasterId);
-  }
-
-  logger.i("App Master ID retrieved: $appMasterId");
-  return appMasterId;
+  logger.i("App Master ID retrieved: $defaultAppMasterId");
+  return defaultAppMasterId;
 }
 
 /// Clears the custom app master ID and restores the default one

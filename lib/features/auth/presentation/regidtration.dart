@@ -347,6 +347,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   ),
                   const SizedBox(height: 15),
                   _buildTextField(
+                    controller: _designationController,
+                    label: "Enter Designation",
+                    icon: Icons.work,
+                  ),
+                  const SizedBox(height: 15),
+                  _buildTextField(
                     controller: _emailController,
                     label: "Enter Email*",
                     icon: Icons.email,
@@ -435,12 +441,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     controller: _referralCodeController,
                     label: "Enter Referral Code",
                     icon: Icons.card_giftcard,
-                  ),
-                  const SizedBox(height: 15),
-                  _buildTextField(
-                    controller: _designationController,
-                    label: "Enter Designation",
-                    icon: Icons.work,
                   ),
                   const SizedBox(height: 20),
                   SizedBox(

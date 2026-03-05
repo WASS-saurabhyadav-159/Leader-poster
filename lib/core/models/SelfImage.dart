@@ -1,10 +1,11 @@
 class SelfImage {
   final String id;
   final String accountId;
-  final int defNum; // Add this field
+  final int defNum;
   final String imageUrl;
   final String imagePath;
   final String position;
+  final String uploadedBy;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -15,6 +16,7 @@ class SelfImage {
     required this.imageUrl,
     required this.imagePath,
     required this.position,
+    required this.uploadedBy,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -23,10 +25,11 @@ class SelfImage {
     return SelfImage(
       id: json['id'],
       accountId: json['accountId'],
-      defNum: json['defNum'], // Parse defNum from JSON
+      defNum: json['defNum'] ?? 0,
       imageUrl: json['image'],
       imagePath: json['imagePath'],
       position: json['position'],
+      uploadedBy: json['uploadedBy'] ?? 'ADMIN',
       createdAt: DateTime.parse(json['createdAt']),
       updatedAt: DateTime.parse(json['updatedAt']),
     );

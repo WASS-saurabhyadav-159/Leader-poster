@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:flutter_html/flutter_html.dart';
 import '../core/models/subscription_plan.dart';
 import '../core/network/api_service.dart';
 import '../core/utils/error_handler.dart';
@@ -19,6 +20,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   String? _errorMessage;
   String? _currentOrderId;
   String? _currentPlanId;
+  String? _converterId;
 
   @override
   void initState() {
@@ -63,6 +65,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _initiatePayment(SubscriptionPlan plan) async {
+    // Show bottom sheet to ask about converter ID
+    final hasConverter = await _showConverterDialog();
+
+    if (hasConverter == null) return; // User cancelled
+
+    if (hasConverter) {
+      // Ask for converter ID
+      final converterId = await _showConverterIdInput();
+      if (converterId == null || converterId.isEmpty) return;
+      _converterId = converterId;
+    } else {
+      _converterId = null;
+    }
+
     try {
       setState(() => _isLoading = true);
 
@@ -104,6 +120,80 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
   }
 
+  Future<bool?> _showConverterDialog() async {
+    return showModalBottomSheet<bool>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Do you have a Converter ID?',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('No', style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('Yes', style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _showConverterIdInput() async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enter Converter ID'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Converter ID',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
     try {
       setState(() => _isLoading = true);
@@ -115,6 +205,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         orderId: _currentOrderId!,
         paymentId: response.paymentId!,
         signature: response.signature!,
+        converterId: _converterId,
       );
 
       setState(() => _isLoading = false);
@@ -315,13 +406,21 @@ class PlanCard extends StatelessWidget {
           /// BENEFITS
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Text(
-              plan.benefits,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
+            child: Html(
+              data: plan.benefits,
+              style: {
+                "body": Style(
+                  margin: Margins.zero,
+                  padding: HtmlPaddings.zero,
+                  fontSize: FontSize(14),
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+                "p": Style(
+                  margin: Margins.zero,
+                  padding: HtmlPaddings.zero,
+                ),
+              },
             ),
           ),
 

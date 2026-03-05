@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "981739718659",
-    "project_id": "bjpposter-9e430",
-    "storage_bucket": "bjpposter-9e430.firebasestorage.app"
+    "project_number": "485736006060",
+    "project_id": "leaderposter-411ab",
+    "storage_bucket": "leaderposter-411ab.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:981739718659:android:275a0dcd16542bb85de636",
+        "mobilesdk_app_id": "1:485736006060:android:e590b2ec5d715ac9967a09",
         "android_client_info": {
           "package_name": "com.leaderposter.poster"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBzzRuL5tg5BArOBb3ocOMAJqj6PHbqrPk"
+          "current_key": "AIzaSyAxYuxRUVuuKFqp_mLXXvAYOCjCxpRfCuA"
         }
       ],
       "services": {
