@@ -24,7 +24,7 @@ class AlbumPostersPage extends StatefulWidget {
 class _AlbumPostersPageState extends State<AlbumPostersPage> {
   final ApiService _apiService = ApiService();
   String? selectedLanguageId;
-  List<Language> languages = [];
+  List<Language> availableLanguages = [];
   List<Poster> posters = [];
   bool isLoadingLanguages = true;
   bool isLoadingPosters = true;
@@ -32,17 +32,35 @@ class _AlbumPostersPageState extends State<AlbumPostersPage> {
   @override
   void initState() {
     super.initState();
-    _loadLanguages();
-    _loadPosters();
+    _loadAvailableLanguages();
   }
 
-  Future<void> _loadLanguages() async {
+  Future<void> _loadAvailableLanguages() async {
     try {
-      final response = await _apiService.fetchLanguages(limit: 100, offset: 0);
+      final response = await _apiService.fetchPostersByAlbum(
+        albumId: widget.albumId,
+        languageId: null,
+      );
+      
+      final Set<String> languageIds = {};
+      for (var json in response) {
+        if (json['languageId'] != null) {
+          languageIds.add(json['languageId'].toString());
+        }
+      }
+
+      final allLanguages = await _apiService.fetchLanguages(limit: 100, offset: 0);
+      final languages = allLanguages.map((json) => Language.fromJson(json)).toList();
+      
       setState(() {
-        languages = response.map((json) => Language.fromJson(json)).toList();
+        availableLanguages = languages.where((lang) => languageIds.contains(lang.id)).toList();
+        if (availableLanguages.isNotEmpty) {
+          selectedLanguageId = availableLanguages[0].id;
+        }
         isLoadingLanguages = false;
       });
+      
+      _loadPosters();
     } catch (e) {
       setState(() {
         isLoadingLanguages = false;
@@ -101,8 +119,7 @@ class _AlbumPostersPageState extends State<AlbumPostersPage> {
       body: Column(
         children: [
 
-          /// 🔴 LANGUAGE FILTER
-          _buildLanguageList(),
+          if (availableLanguages.isNotEmpty) _buildLanguageList(),
 
           /// 🔵 POSTER GRID
           Expanded(
@@ -170,49 +187,9 @@ class _AlbumPostersPageState extends State<AlbumPostersPage> {
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: languages.length + 1,
+        itemCount: availableLanguages.length,
         itemBuilder: (context, index) {
-          if (index == 0) {
-            final isSelected = selectedLanguageId == null;
-            return GestureDetector(
-              onTap: () {
-                setState(() => selectedLanguageId = null);
-                _loadPosters();
-              },
-              child: Container(
-                margin: const EdgeInsets.only(right: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isSelected ? Colors.red : Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isSelected ? Colors.red : Colors.grey.shade400,
-                    width: 1.2,
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    "All",
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.black,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }
-
-          if (isLoadingLanguages) {
-            return Container(
-              margin: const EdgeInsets.only(right: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: const CircularProgressIndicator(strokeWidth: 2),
-            );
-          }
-
-          final lang = languages[index - 1];
+          final lang = availableLanguages[index];
           final isSelected = selectedLanguageId == lang.id;
 
           return GestureDetector(

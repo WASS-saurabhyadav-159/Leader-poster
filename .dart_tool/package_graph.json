@@ -27,6 +27,7 @@
         "flutter_svg",
         "fluttertoast",
         "font_awesome_flutter",
+        "glassmorphism",
         "image",
         "image_picker",
         "intl",
@@ -94,6 +95,13 @@
     {
       "name": "font_awesome_flutter",
       "version": "10.12.0",
+      "dependencies": [
+        "flutter"
+      ]
+    },
+    {
+      "name": "glassmorphism",
+      "version": "3.0.0",
       "dependencies": [
         "flutter"
       ]

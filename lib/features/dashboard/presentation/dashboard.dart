@@ -28,6 +28,7 @@ class Dashboard extends StatefulWidget {
 class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   int _selectedIndex = 0;
   bool _isNotificationClicked = false;
+  String _planName = 'Free';
 
   late AnimationController _animationController;
   late Animation<Offset> _offsetAnimation;
@@ -137,6 +138,17 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         // Optional: handle UNKNOWN or other statuses if needed
         await prefs.setBool('account_deactivated', false);
         logger.i("Account status: UNKNOWN or Other saved as false");
+      }
+
+      // Extract plan name
+      final planName = (profile['plan'] != null && profile['plan']['packageName'] != null)
+          ? profile['plan']['packageName']
+          : 'Free';
+      
+      if (mounted) {
+        setState(() {
+          _planName = planName;
+        });
       }
     } catch (e, stacktrace) {
       logger.e("Error checking account status", error: e, stackTrace: stacktrace);
@@ -272,7 +284,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                       color: Colors.red,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Column(
                         children: [
                           Text(
@@ -285,7 +297,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                             ),
                           ),
                           Text(
-                            'Free',
+                            _planName,
                             maxLines: 1,
                             style: TextStyle(
                               color: Colors.white,
@@ -391,7 +403,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
               elevation: 10,
               items: [
                 _buildBottomNavItem(0, "Home"),
-                _buildBottomNavItem(1, "Folder"),
+                _buildBottomNavItem(1, "Albums"),
                 _buildBottomNavItem(2, "Profile"),
               ],
             )

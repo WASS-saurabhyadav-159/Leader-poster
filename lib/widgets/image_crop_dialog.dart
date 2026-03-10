@@ -47,6 +47,13 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // Calculate crop dimensions based on poster's self image container
+    // Self image uses: height = canvasHeight * 0.40, width = height * 0.9
+    // This gives aspect ratio of 0.9:1 (width:height)
+    final screenHeight = MediaQuery.of(context).size.height;
+    final cropHeight = screenHeight * 0.5; // Use 50% of screen height
+    final cropWidth = cropHeight * 0.9; // Maintain 0.9:1 aspect ratio
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -82,8 +89,8 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
-                        width: MediaQuery.of(context).size.width * 0.8,
-                        height: MediaQuery.of(context).size.height * 0.6,
+                        width: cropWidth,
+                        height: cropHeight,
                         child: InteractiveViewer(
                           transformationController: _controller,
                           minScale: 0.5,
@@ -101,11 +108,21 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
                       ),
                     ),
                   ),
+                  // Grid overlay
+                  IgnorePointer(
+                    child: Container(
+                      width: cropWidth,
+                      height: cropHeight,
+                      child: CustomPaint(
+                        painter: GridPainter(),
+                      ),
+                    ),
+                  ),
                   // Border overlay
                   IgnorePointer(
                     child: Container(
-                      width: MediaQuery.of(context).size.width * 0.8,
-                      height: MediaQuery.of(context).size.height * 0.6,
+                      width: cropWidth,
+                      height: cropHeight,
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.white, width: 2),
                         borderRadius: BorderRadius.circular(8),
@@ -218,4 +235,41 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
       ),
     );
   }
+}
+
+// Grid painter for crop overlay
+class GridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.3)
+      ..strokeWidth = 1;
+
+    // Draw vertical lines (divide into 3 parts)
+    canvas.drawLine(
+      Offset(size.width / 3, 0),
+      Offset(size.width / 3, size.height),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(size.width * 2 / 3, 0),
+      Offset(size.width * 2 / 3, size.height),
+      paint,
+    );
+
+    // Draw horizontal lines (divide into 3 parts)
+    canvas.drawLine(
+      Offset(0, size.height / 3),
+      Offset(size.width, size.height / 3),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(0, size.height * 2 / 3),
+      Offset(size.width, size.height * 2 / 3),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

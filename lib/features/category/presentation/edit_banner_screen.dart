@@ -3081,14 +3081,15 @@ class _SocialMediaDetailsPageState extends State<SocialMediaDetailsPage> {
         builder: (context) => ImageCropDialog(imageFile: imageToUse),
       );
 
-      // If user confirmed crop, ask for position
+      // If user confirmed crop, use poster position automatically
       if (croppedFile != null) {
-        final selectedPosition = await _showPositionDialog();
+        // Use the poster's initialPosition directly
+        String positionToUse = widget.initialPosition.isNotEmpty 
+            ? widget.initialPosition.toLowerCase().trim() 
+            : 'right'; // Default to right if no position defined
         
-        if (selectedPosition != null) {
-          // Upload to API
-          await _uploadSelfImage(croppedFile, selectedPosition);
-        }
+        // Upload to API with the poster's position
+        await _uploadSelfImage(croppedFile, positionToUse);
       }
     }
   }

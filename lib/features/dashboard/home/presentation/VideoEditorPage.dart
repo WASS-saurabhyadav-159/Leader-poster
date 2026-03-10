@@ -26,6 +26,7 @@ import '../../../../core/models/SelfImage.dart';
 import '../../../../core/network/ImageCacheHelper.dart';
 import '../../../../core/network/api_service.dart';
 import '../../../../core/services/background_removal_service.dart';
+import '../../../../core/services/video_processor_service.dart';
 import '../../../../screens/subscription_screen.dart';
 import '../../../../widgets/image_crop_dialog.dart';
 
@@ -1049,66 +1050,26 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
   }
 
   Future<File> _createVideoWithOverlays(File originalVideo) async {
-    final directory = await getApplicationDocumentsDirectory();
-    final outputPath = '${directory.path}/final_video_${DateTime.now().millisecondsSinceEpoch}.mp4';
-
-    await Directory(directory.path).create(recursive: true);
-
     final overlayImage = await _createCompositeOverlay();
     if (!await overlayImage.exists()) {
       throw Exception("Overlay image not found at ${overlayImage.path}");
     }
 
-    final inputVideoPath = originalVideo.path;
-    final overlayPath = overlayImage.path;
-
-    final inputExists = await File(inputVideoPath).exists();
-    final inputLen = inputExists ? await File(inputVideoPath).length() : 0;
-    final overlayExists = await File(overlayPath).exists();
-    final overlayLen = overlayExists ? await File(overlayPath).length() : 0;
-
-    print('FFmpeg input video: $inputVideoPath (exists=$inputExists, size=$inputLen)');
-    print('FFmpeg overlay image: $overlayPath (exists=$overlayExists, size=$overlayLen)');
-
-    final command = '-y -i "$inputVideoPath" -i "$overlayPath" '
-        '-filter_complex "[0:v][1:v]overlay=0:0:enable=\'between(t,0,999999)\'" '
-    // '-c:v libx264 -preset slow -crf 18 -c:a copy -pix_fmt yuv420p '
-    // '-movflags +faststart "$outputPath"';
-        '-c:v libx264 -preset slow -crf 15 -profile:v high -level 4.2 '
-        '-pix_fmt yuv420p -movflags +faststart -c:a copy "$outputPath"';
-    print('Executing FFmpeg command: $command');
-
     try {
-      final session = await FFmpegKit.execute(command);
-      final returnCode = await session.getReturnCode();
-      final logs = await session.getAllLogsAsString();
+      final outputFile = await VideoProcessorService.processVideoWithOverlay(
+        videoFile: originalVideo,
+        overlayFile: overlayImage,
+      );
 
-      print('FFmpeg return code: $returnCode');
-      print('FFmpeg logs: $logs');
-
-      if (ReturnCode.isSuccess(returnCode)) {
-        final outputFile = File(outputPath);
-        final outputExists = await outputFile.exists();
-        final outputSize = outputExists ? await outputFile.length() : 0;
-
-        if (outputExists && outputSize > 0) {
-          print('Video processing successful! Output: ${outputFile.path} (size: $outputSize bytes)');
-
-          try {
-            await overlayImage.delete();
-          } catch (e) {
-            print('Could not delete overlay file: $e');
-          }
-
-          return outputFile;
-        } else {
-          throw Exception('FFmpeg succeeded but output file is empty or missing. Output exists: $outputExists, size: $outputSize');
-        }
-      } else {
-        throw Exception('FFmpeg failed with return code: $returnCode\nLogs: $logs');
+      try {
+        await overlayImage.delete();
+      } catch (e) {
+        print('Could not delete overlay file: $e');
       }
+
+      return outputFile;
     } catch (e) {
-      throw Exception('FFmpeg execution failed: $e');
+      throw Exception('Video processing failed: $e');
     }
   }
 

@@ -25,6 +25,9 @@ class InvoicePage extends StatelessWidget {
 
   Future<void> _downloadPdf(BuildContext context) async {
     final pdf = pw.Document();
+    
+    // Remove any rupee symbols or special characters from amount
+    final cleanAmount = amount.replaceAll('₹', '').replaceAll('Rs.', '').replaceAll('Rs', '').trim();
 
     pdf.addPage(
       pw.Page(
@@ -57,11 +60,11 @@ class InvoicePage extends StatelessWidget {
                     pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
-                        pw.Text("POSTER APP",
+                        pw.Text("LEADER POSTER APP",
                             style: pw.TextStyle(
                                 fontWeight: pw.FontWeight.bold)),
                         pw.SizedBox(height: 4),
-                        pw.Text("support@posterapp.com",
+                        pw.Text("leaderposter.com@gmail.com",
                             style: const pw.TextStyle(fontSize: 10)),
                       ],
                     )
@@ -132,7 +135,7 @@ class InvoicePage extends StatelessWidget {
                         _tableCell(plan, false),
                         _tableCell(start, false),
                         _tableCell(end, false),
-                        _tableCell(amount, false),
+                        _tableCell("INR $cleanAmount", false),
                       ],
                     ),
                   ],
@@ -143,7 +146,7 @@ class InvoicePage extends StatelessWidget {
                 pw.Align(
                   alignment: pw.Alignment.centerRight,
                   child: pw.Text(
-                    "Total Amount: $amount",
+                    "Total Amount: INR $cleanAmount",
                     style: pw.TextStyle(
                       fontSize: 16,
                       fontWeight: pw.FontWeight.bold,
@@ -161,7 +164,7 @@ class InvoicePage extends StatelessWidget {
                     children: [
                       pw.Text("Authorized Signature"),
                       pw.SizedBox(height: 20),
-                      pw.Text("Poster App",
+                      pw.Text("Leader Poster App",
                           style: pw.TextStyle(
                               fontWeight: pw.FontWeight.bold)),
                     ],
@@ -272,7 +275,7 @@ class InvoicePage extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.black,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(1),
                   ),
                 ),
                 child: const Text(

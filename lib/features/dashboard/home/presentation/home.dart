@@ -50,8 +50,6 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   }
 
   Future<void> _loadData() async {
-    if (_initialLoadComplete) return;
-
     setState(() {
       _isLoading = true;
       _hasError = false;

@@ -410,6 +410,12 @@
       "languageVersion": "3.9"
     },
     {
+      "name": "glassmorphism",
+      "rootUri": "file:///Users/wass29/.pub-cache/hosted/pub.dev/glassmorphism-3.0.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "glob",
       "rootUri": "file:///Users/wass29/.pub-cache/hosted/pub.dev/glob-2.1.3",
       "packageUri": "lib/",
