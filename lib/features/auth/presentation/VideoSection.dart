@@ -73,18 +73,18 @@ class _VideoSectionState extends State<VideoSection> {
     String finalVideoUrl = _extractDirectVideoUrl(video.iframeLink);
     debugPrint("🎬 Direct Video URL => $finalVideoUrl");
 
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => VideoEditorPage(
-          videoUrl: finalVideoUrl,
-          initialPosition: video.position,
-          topDefNum: video.topDefNum ?? 0,
-          selfDefNum: video.selfDefNum ?? 0,
-          bottomDefNum: video.bottomDefNum ?? 0,
-        ),
-      ),
-    );
+    // await Navigator.push(
+    //   context,
+    //   MaterialPageRoute(
+    //     builder: (_) => VideoEditorPage(
+    //       videoUrl: finalVideoUrl,
+    //       initialPosition: video.position,
+    //       topDefNum: video.topDefNum ?? 0,
+    //       selfDefNum: video.selfDefNum ?? 0,
+    //       bottomDefNum: video.bottomDefNum ?? 0,
+    //     ),
+    //   ),
+    // );
   }
 
   String _extractDirectVideoUrl(String iframeUrl) {

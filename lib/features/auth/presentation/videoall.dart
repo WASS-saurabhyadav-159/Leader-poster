@@ -48,18 +48,18 @@ class _AllVideosPageState extends State<AllVideosPage> {
 
   Future<void> _handleVideoTap(Video video) async {
     final finalVideoUrl = _extractDirectVideoUrl(video.iframeLink);
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => VideoEditorPage(
-          videoUrl: finalVideoUrl,
-          initialPosition: video.position,
-          topDefNum: video.topDefNum ?? 0,
-          selfDefNum: video.selfDefNum ?? 0,
-          bottomDefNum: video.bottomDefNum ?? 0,
-        ),
-      ),
-    );
+    // await Navigator.push(
+    //   context,
+    //   MaterialPageRoute(
+    //     builder: (_) => VideoEditorPage(
+    //       videoUrl: finalVideoUrl,
+    //       initialPosition: video.position,
+    //       topDefNum: video.topDefNum ?? 0,
+    //       selfDefNum: video.selfDefNum ?? 0,
+    //       bottomDefNum: video.bottomDefNum ?? 0,
+    //     ),
+    //   ),
+    // );
   }
 
   /// Prefer API thumbnail, else try deriving (vz b-cdn or YouTube)

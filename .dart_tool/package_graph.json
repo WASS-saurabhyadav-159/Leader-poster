@@ -14,7 +14,6 @@
         "connectivity_plus",
         "cupertino_icons",
         "dio",
-        "ffmpeg_kit_min_gpl",
         "firebase_analytics",
         "firebase_core",
         "firebase_messaging",
@@ -223,14 +222,6 @@
         "flutter_image_compress_ohos",
         "flutter_image_compress_platform_interface",
         "flutter_image_compress_web"
-      ]
-    },
-    {
-      "name": "ffmpeg_kit_min_gpl",
-      "version": "6.0.3+2-LTS",
-      "dependencies": [
-        "ffmpeg_kit_flutter_platform_interface",
-        "flutter"
       ]
     },
     {
@@ -876,14 +867,6 @@
       "version": "1.0.5",
       "dependencies": [
         "cross_file",
-        "flutter",
-        "plugin_platform_interface"
-      ]
-    },
-    {
-      "name": "ffmpeg_kit_flutter_platform_interface",
-      "version": "0.2.1",
-      "dependencies": [
         "flutter",
         "plugin_platform_interface"
       ]

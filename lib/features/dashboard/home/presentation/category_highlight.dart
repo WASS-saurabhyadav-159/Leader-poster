@@ -270,10 +270,10 @@ class _CategoryHighlightDisplayState extends State<CategoryHighlightDisplay> {
 
   Future<void> _handlePosterTap(Poster poster) async {
     if (poster.isVideo) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => VideoEditorPage(videoUrl: poster.posterUrl ?? "")),
-      );
+      // await Navigator.push(
+      //   context,
+      //   MaterialPageRoute(builder: (_) => VideoEditorPage(videoUrl: poster.posterUrl ?? "")),
+      // );
     } else {
       await Navigator.push(
         context,

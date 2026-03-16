@@ -50,12 +50,12 @@ class AllPosterPage extends StatelessWidget {
           return GestureDetector(
             onTap: () {
               if (poster.isVideo) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => VideoEditorPage(videoUrl: poster.posterUrl),
-                  ),
-                );
+                // Navigator.push(
+                //   context,
+                //   MaterialPageRoute(
+                //     builder: (context) => VideoEditorPage(videoUrl: poster.posterUrl),
+                //   ),
+                // );
               } else {
                 Navigator.push(
                   context,

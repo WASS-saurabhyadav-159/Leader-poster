@@ -194,18 +194,6 @@
       "languageVersion": "3.7"
     },
     {
-      "name": "ffmpeg_kit_flutter_platform_interface",
-      "rootUri": "file:///Users/wass29/.pub-cache/hosted/pub.dev/ffmpeg_kit_flutter_platform_interface-0.2.1",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
-      "name": "ffmpeg_kit_min_gpl",
-      "rootUri": "file:///Users/wass29/.pub-cache/hosted/pub.dev/ffmpeg_kit_min_gpl-6.0.3+2-LTS",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
       "name": "file",
       "rootUri": "file:///Users/wass29/.pub-cache/hosted/pub.dev/file-7.0.1",
       "packageUri": "lib/",
